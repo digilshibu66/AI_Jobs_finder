@@ -110,6 +110,8 @@ GEMINI_API_KEY=your_gemini_api_key_here
 RESUME_PATH=path/to/your/resume.pdf
 SMTP_EMAIL=your_email@gmail.com
 SMTP_PASSWORD=your_app_password_here
+SMTP_SERVER=smtp.gmail.com
+SMTP_PORT=587
 
 # Optional Settings
 SEND_EMAILS=false
