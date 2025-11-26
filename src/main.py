@@ -13,11 +13,12 @@ from dotenv import load_dotenv
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 # Use absolute imports instead of relative imports
-from scraper import scrape_jobs
-from resume_embedder import extract_resume_text
-from email_agent import generate_mail_body, find_company_email
-from smtp_sender import send_email
-from excel_logger import email_logger
+sys.path.append(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'modules'))
+from modules.scraper import scrape_jobs
+from modules.resume_embedder import extract_resume_text
+from modules.email_agent import generate_mail_body, find_company_email
+from modules.smtp_sender import send_email
+from modules.excel_logger import email_logger
 
 def load_config():
     """Load configuration from .env file or environment variables."""
@@ -28,7 +29,10 @@ def load_config():
         'resume': os.getenv('RESUME_PATH'),
         'smtp_email': os.getenv('SMTP_EMAIL'),
         'smtp_password': os.getenv('SMTP_PASSWORD'),
-        'send': os.getenv('SEND_EMAILS', 'false').lower() == 'true'
+        'send': os.getenv('SEND_EMAILS', 'false').lower() == 'true',
+        'job_type': os.getenv('JOB_TYPE', 'software'),
+        'job_category': os.getenv('JOB_CATEGORY', 'freelance'),  # freelance or normal
+        'job_limit': int(os.getenv('JOB_LIMIT', '30'))
     }
     
     return config
@@ -96,8 +100,8 @@ def run(resume_path, smtp_email, smtp_password, dry_run=True):
     print("Resume text loaded.", resume_text[:200])
 
     print("Scraping jobs...")
-    jobs = scrape_jobs(limit=20)  # Increased limit for better job coverage
-    print(f"Found {len(jobs)} job(s).")
+    jobs = scrape_jobs(limit=args.job_limit, job_type=args.job_type, job_category=args.job_category)
+    print(f"Found {len(jobs)} {args.job_category} job(s) for '{args.job_type}' type.")
 
     for job in jobs:
         print("\n" + "="*80)
@@ -234,6 +238,9 @@ if __name__ == '__main__':
     parser.add_argument('--smtp-email', default=config['smtp_email'], help='SMTP sender email')
     parser.add_argument('--smtp-password', default=config['smtp_password'], help='SMTP app password')
     parser.add_argument('--send', action='store_true', default=config['send'], help='Actually send emails (default is dry run)')
+    parser.add_argument('--job-type', default=config['job_type'], help='Job type to search for (default: software)')
+    parser.add_argument('--job-category', default=config['job_category'], choices=['freelance', 'normal'], help='Job category (default: freelance)')
+    parser.add_argument('--job-limit', type=int, default=config['job_limit'], help='Number of jobs to process (default: 30)')
     
     args = parser.parse_args()
     
