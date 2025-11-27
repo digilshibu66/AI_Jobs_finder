@@ -1,271 +1,262 @@
-# Freelance Mailer
+# Jobs Mail Sender
 
-Automated tool that scrapes software/tech freelancing websites, generates personalized application emails using Gemini AI, attaches your resume, and sends applications via SMTP. All email activities are tracked in an Excel log for review.
-
-## Table of Contents
-
-- [System Architecture](#system-architecture)
-- [Enhanced Features](#enhanced-features)
-- [Prerequisites](#prerequisites)
-- [Installation](#installation)
-- [Configuration](#configuration)
-- [Usage](#usage)
-- [Excel Logging](#excel-logging)
-- [Project Structure](#project-structure)
-- [Supportive Resources](#supportive-resources)
-- [Notes](#notes)
+An automated tool that scrapes job websites, generates personalized application emails using Gemini AI, attaches resume and motivational letters, and sends via SMTP.
 
 ## System Architecture
 
 ```mermaid
 graph TD
-    A[Main.py - CLI Orchestrator] --> B[Scraper.py - Smart Job Scraping]
-    A --> C[Resume Embedder - PDF Processing]
-    A --> D[Email Agent - Gemini AI Engine]
-    A --> E[SMTP Sender - Email Delivery]
-    A --> F[Excel Logger - Activity Tracking]
+    A[User] --> B[CLI/Web Interface]
+    B --> C[Main Application]
+    C --> D[Job Scraper]
+    C --> E[Resume Processor]
+    C --> F[Email Generator]
+    C --> G[Email Finder]
+    C --> H[Email Sender]
+    C --> I[Activity Logger]
     
-    B --> G[Multiple Freelance Platforms]
-    C --> H[Resume.pdf]
-    D --> I[Gemini 2.0 Flash API]
-    E --> J[Email Server]
-    F --> K[email_log.xlsx]
+    D --> J[Multiple Job Platforms]
+    E --> K[PDF Resume]
+    F --> L[Gemini AI]
+    G --> M[Contact Discovery]
+    H --> N[SMTP Server]
+    I --> O[Excel Log]
+    
+    style A fill:#e1f5fe
+    style B fill:#f3e5f5
+    style C fill:#e8f5e8
+    style D fill:#fff3e0
+    style E fill:#fce4ec
+    style F fill:#f1f8e9
+    style G fill:#fff8e1
+    style H fill:#e0f2f1
+    style I fill:#efebe9
 ```
 
-**Workflow Process:**
+### Components
 
-1. **Job Discovery**: Smart scraper finds 30 software/tech jobs from multiple platforms
-2. **Email Intelligence**: AI analyzes jobs and finds valid company contact emails
-3. **Personalization**: Gemini creates tailored cover letters starting with "Hi Sir,"
-4. **Validation**: System validates emails and skips invalid/platform addresses
-5. **Delivery**: Sends personalized applications with resume attachments
-6. **Tracking**: All activities logged to Excel for performance analysis
+1. **Job Scraper**: Collects job listings from multiple platforms (Various job boards)
+2. **Resume Processor**: Extracts text from PDF resume for personalization
+3. **Email Generator**: Creates personalized emails using Gemini AI
+4. **Email Finder**: Discovers company contact emails through multiple strategies
+5. **Email Sender**: Sends emails with resume and motivational letter attachments
+6. **Activity Logger**: Records all actions in an Excel spreadsheet
+7. **Web Dashboard**: Provides a user-friendly interface for configuration and monitoring
 
-## Enhanced Features
-
-- 🔍 **Intelligent Multi-site Scraping**: Scrapes 4+ platforms for software/tech jobs only
-- 🤖 **Gemini 2.0 Flash Powered**: Uses latest AI for superior email generation
-- 🎯 **Smart Email Discovery**: Advanced email finding with 3-tier strategy
-- 🚫 **Platform Email Blocking**: Never sends to freelancer.com, upwork.com, etc.
-- ✅ **Email Validation**: Only targets real company/client email addresses
-- 📧 **Professional Formatting**: All emails start with "Hi Sir," as requested
-- 📎 **Resume Attachment**: Automatically attaches your resume to all applications
-- 🚀 **Secure SMTP Integration**: Gmail-compatible with app password support
-- 📊 **Comprehensive Activity Tracking**: Detailed Excel logs with status tracking
-- ⚙️ **Safe Dry Run Mode**: Test functionality without sending actual emails
-- 📈 **Daily Job Processing**: Handles up to 30 jobs per day automatically
+## Features
+- Scrapes multiple job platforms (Various job types)
+- Generates personalized emails and motivational letters using Gemini AI
+- Automatically finds company contact emails
+- Attaches resume and motivational letter to applications
+- Logs all activities to Excel spreadsheet
+- Web dashboard for easy job control
+- Docker support for easy deployment
+- Makefile for simplified command execution
 
 ## Prerequisites
-
 - Python 3.8 or higher
-- Google Gemini API key (free tier available)
-- SMTP-enabled email account (Gmail with app password recommended)
+- Node.js 16+ (for web dashboard)
+- Gemini API Key
+- SMTP credentials (Gmail app password recommended)
 - Resume in PDF format
-- Stable internet connection
 
 ## Installation
 
-1. Clone or download the repository:
+### Option 1: Direct Installation
+1. Clone the repository:
    ```bash
    git clone <repository-url>
-   cd freelance_mailer_package
+   cd jobs_mail_sender
    ```
 
-2. Create a virtual environment (recommended):
+2. Create a virtual environment:
    ```bash
    python -m venv venv
-   # On Windows:
-   venv\Scripts\activate
-   # On macOS/Linux:
-   source venv/bin/activate
    ```
 
-3. Install dependencies:
+3. Activate the virtual environment:
+   - Windows: `venv\Scripts\activate`
+   - macOS/Linux: `source venv/bin/activate`
+
+4. Install backend dependencies:
    ```bash
-   pip install -r config/requirements.txt
+   pip install -r backend/requirements.txt
    ```
 
-4. Verify installation:
+5. Install frontend dependencies:
    ```bash
-   python -c "import google.generativeai; print('Gemini API ready')"
+   cd frontend
+   npm install
+   cd ../..
    ```
 
-## Configuration
+### Option 2: Using Make (Recommended)
+1. Clone the repository:
+   ```bash
+   git clone <repository-url>
+   cd jobs_mail_sender
+   ```
 
-### Environment Variables
+2. Install all dependencies:
+   ```bash
+   make setup
+   ```
 
-Create a `.env` file in the `config/` directory with your configuration:
+## Environment Configuration
 
-```env
-# Required Settings
-GEMINI_API_KEY=your_gemini_api_key_here
-RESUME_PATH=path/to/your/resume.pdf
-SMTP_EMAIL=your_email@gmail.com
-SMTP_PASSWORD=your_app_password_here
-SMTP_SERVER=smtp.gmail.com
-SMTP_PORT=587
+### Understanding Environment Files
 
-# Job Search Configuration
-JOB_TYPE=software              # software, web, mobile, data
-JOB_CATEGORY=freelance         # freelance or normal
-JOB_LIMIT=30                  # Number of jobs to process daily
+There are two environment files in the project:
+1. **`.env`** (Root directory): The main configuration file that the application uses
+2. **`.env.example`** (Root directory): Template file with all configuration options
 
-# Optional Settings
-SEND_EMAILS=false
-GOOGLE_SEARCH_API_KEY=your_google_search_api_key  # For enhanced email finding
-GOOGLE_SEARCH_ENGINE_ID=your_custom_search_engine_id
-```
+**Note**: The `backend/.env` file is legacy and will be removed. The application now uses the root `.env` file.
 
-### Getting Your Gemini API Key
+### Setting Up Your Environment
 
-1. Visit [Google AI Studio](https://aistudio.google.com/)
-2. Sign in with your Google account
-3. Click "Get API key" in the left sidebar
-4. Create a new API key
-5. Copy and paste it into your `.env` file
+1. Copy the `.env.example` to `.env`:
+   ```bash
+   cp .env.example .env
+   ```
+   Or using Make:
+   ```bash
+   make env-example
+   ```
 
-### Setting Up Gmail SMTP (Recommended)
+2. Edit the `.env` file with your configuration:
+   ```env
+   # Gemini API Key (required)
+   GEMINI_API_KEY=your_actual_gemini_api_key
+   
+   # SMTP configuration
+   SMTP_SERVER=smtp.gmail.com
+   SMTP_PORT=587
+   SMTP_EMAIL=your_email@gmail.com
+   SMTP_PASSWORD=your_app_password
+   
+   # Path to your resume PDF
+   RESUME_PATH=path/to/your/resume.pdf
+   
+   # Job search settings
+   JOB_TYPE=software
+   JOB_CATEGORY=normal  # or 'freelance'
+   JOB_LIMIT=30
+   
+   # Email sending mode
+   SEND_EMAILS=false  # Set to 'true' to actually send emails
+   
+   # Motivational letter generation
+   GENERATE_MOTIVATIONAL_LETTER=true
+   
+   # Google Search API (optional, for enhanced email finding)
+   # GOOGLE_SEARCH_API_KEY=your_google_search_api_key
+   # GOOGLE_SEARCH_ENGINE_ID=your_google_search_engine_id
+   ```
 
-1. Enable 2-factor authentication on your Google account
-2. Go to [Google Account Security](https://myaccount.google.com/security)
-3. Under "Signing in to Google," select "App passwords"
-4. Generate a new app password for "Mail"
-5. Use this as your `SMTP_PASSWORD` in the `.env` file
+### Important Notes
 
-### Scraper Customization
-
-Edit `src/modules/scraper.py` to customize:
-- Target freelancing websites
-- Tech keywords for filtering
-- Scraping limits and delays
-- User agent rotation
+- **Never commit your `.env` file** to version control as it contains sensitive information
+- **Use app-specific passwords** for Gmail rather than your regular password
+- **The application only sends emails to verified company contacts**, not to job platforms
+- **The root `.env` file is used by both CLI and web interface**
+- **Delete the `backend/.env` file** if it exists to avoid confusion
 
 ## Usage
 
-### Dry Run Mode (Recommended First)
-Preview the system without sending actual emails:
+### Command Line Interface
 ```bash
-cd src
-python main.py
+# Dry run (default) - generates emails but doesn't send them
+python backend/main.py
+
+# Actually send emails
+python backend/main.py --send
+
+# Specify job type and category
+python backend/main.py --job-type=data --job-category=freelance --job-limit=10
+
+# Generate motivational letters (enabled by default)
+python backend/main.py --generate-motivational-letter
+
+# View all options
+python backend/main.py --help
 ```
 
-### Send Actual Applications
-Add the `--send` flag to actually send emails:
+### Using Make (Recommended)
 ```bash
-cd src
-python main.py --send
+# See all available commands
+make help
+
+# Install all dependencies
+make setup
+
+# Start the backend server
+make run-backend
+
+# Start the frontend development server
+make run-frontend
+
+# Run job processing (dry run)
+make run-jobs
+
+# Run job processing and send emails
+make run-jobs-send
+
+# Build and run with Docker
+make build-docker
+make run-docker
+
+# Run tests
+make test
+
+# Clean temporary files
+make clean
 ```
 
-### Command Line Arguments
-
-| Argument | Required | Description |
-|---------|----------|-------------|
-| `--resume` | Yes (via .env) | Path to your resume PDF file |
-| `--smtp-email` | Yes (via .env) | Your SMTP email address |
-| `--smtp-password` | Yes (via .env) | Your SMTP app password |
-| `--job-category` | No | `freelance` or `normal` (default: freelance) |
-| `--job-type` | No | `software`, `web`, `mobile`, `data` (default: software) |
-| `--job-limit` | No | Number of jobs to process (default: 30) |
-| `--send` | No | Flag to actually send emails (omit for dry run) |
-
-### Daily Operation
-
-The system automatically processes up to 30 software/tech jobs per day with intelligent email validation and targeting.
-
-### Quick Start Scripts
-
-From the root directory:
+### Web Dashboard
+Start the web server:
 ```bash
-# Run both freelance and normal job searches
-python run_jobs.py --mode both --job-type software --job-limit 30
+python backend/server.py
+```
+Then open `http://localhost:5000` in your browser.
 
-# Run only freelance jobs
-python run_jobs.py --mode freelance --job-type web --job-limit 20
+### Docker Usage
+```bash
+# Build and run with docker-compose
+docker-compose up --build
 
-# Run only normal jobs
-python run_jobs.py --mode normal --job-type mobile --job-limit 15
+# Run with custom environment variables
+docker run -e GEMINI_API_KEY=your_key -e SMTP_EMAIL=your_email -e SMTP_PASSWORD=your_password -v /path/to/resume.pdf:/app/resume.pdf jobs-mail-sender
+
+# Run a specific command
+docker run jobs-mail-sender python backend/main.py --help
 ```
 
-## Excel Logging
+## How It Works
 
-All email activities are automatically logged to `email_log.xlsx` in the project directory with comprehensive tracking:
+1. **Job Scraping**: Scrapes job listings from multiple platforms based on your criteria
+2. **Resume Processing**: Processes your resume to extract relevant information
+3. **Email Generation**: Generates personalized email content using Gemini AI
+4. **Contact Discovery**: Attempts to find the appropriate contact email for each company using multiple strategies:
+   - Direct extraction from job postings
+   - AI-powered search using Gemini
+   - Google Custom Search API (if configured)
+   - Common email pattern generation
+5. **Motivational Letter Creation**: Generates personalized motivational letters for each position
+6. **Email Sending**: Sends emails with your resume and motivational letter attached
+7. **Activity Logging**: Logs all activities to `email_log.xlsx`
 
-- **Timestamp**: When the action occurred
-- **Job Title**: Position being applied to
-- **Company Name**: Client or employer
-- **Recipient Email**: Target contact address
-- **Email Subject**: Generated subject line
-- **Email Body**: Full content of the application
-- **Status**: DRY_RUN/SUCCESS/FAILED/SKIPPED
-- **Error Message**: Details for failed attempts
-- **Source URL**: Original job posting link
+## Security Notes
+- Never commit your `.env` file to version control
+- Use app-specific passwords for Gmail rather than your regular password
+- The application only sends emails to verified company contacts, not to job platforms
+- All sensitive data is stored locally and not transmitted to external servers
 
-### Log Analysis Benefits
+## Troubleshooting
+- Ensure your Gemini API key is valid and has the necessary permissions
+- Check that your SMTP credentials are correct
+- Verify your resume path is correct and accessible
+- If emails aren't sending, try running in dry-run mode first to test the process
+- Make sure your `.env` file is in the root directory, not in the backend directory
 
-- Track application success rates
-- Review email content for optimization
-- Identify skipped jobs and reasons
-- Monitor daily processing volume
-- Analyze platform performance
-
-## Project Structure
-
-```
-freelance_mailer_package/
-├── config/
-│   ├── .env.example          # Configuration file template
-│   └── requirements.txt      # Python dependencies
-├── docs/
-│   └── README.md             # Project documentation
-├── scripts/
-│   ├── run_jobs.py           # Script to run job searches
-│   ├── run_jobs.bat          # Windows batch script
-│   └── run_jobs.sh           # Unix/Linux/Mac shell script
-├── src/
-│   ├── main.py               # Main entry point
-│   └── modules/
-│       ├── email_agent.py    # AI-powered email generation
-│       ├── excel_logger.py   # Email activity logging
-│       ├── resume_embedder.py# Resume text extraction
-│       ├── scraper.py        # Job scraping functionality
-│       └── smtp_sender.py    # Email sending functionality
-├── run.py                    # Root entry point
-└── run_jobs.py               # Simple job runner
-```
-
-## Supportive Resources
-
-### API Services
-
-- [Google AI Studio - Gemini API](https://aistudio.google.com/) - Free API key registration
-- [Google Cloud Console](https://console.cloud.google.com/) - Optional Google Search API setup
-
-### Documentation
-
-- [Gemini API Documentation](https://ai.google.dev/docs) - Official Gemini integration guides
-- [Python Email Libraries](https://docs.python.org/3/library/email.html) - SMTP implementation details
-- [BeautifulSoup Documentation](https://www.crummy.com/software/BeautifulSoup/bs4/doc/) - Web scraping reference
-
-### Development Tools
-
-- [Visual Studio Code](https://code.visualstudio.com/) - Recommended IDE
-- [Python Virtual Environments](https://docs.python.org/3/tutorial/venv.html) - Isolation best practices
-- [dotenv Documentation](https://pypi.org/project/python-dotenv/) - Environment variable management
-
-### Troubleshooting
-
-- **403 Errors**: System includes anti-blocking headers and delays
-- **Email Not Found**: Multi-tier search with Gemini AI and fallback patterns
-- **SMTP Issues**: Verify app password and 2FA settings
-- **Scraping Failures**: Check CSS selectors in scraper.py
-
-## Notes
-
-- The system is configured to process 30 jobs daily by default
-- Only sends emails to actual company contacts, not platform emails
-- Uses AI to generate personalized applications
-- Maintains a log of all activities in `email_log.xlsx`
-- In dry-run mode (default), no emails are actually sent
-- Requires a Google Gemini API key for AI functionality
-- SMTP app passwords are recommended for Gmail accounts
-- Resume should be in PDF format for best results
+## Contributing
+Contributions are welcome! Please fork the repository and submit a pull request.

@@ -1,0 +1,222 @@
+.job-logs h3 {
+  margin-top: 0;
+  color: #333;
+  border-bottom: 2px solid #f0f0f0;
+  padding-bottom: 10px;
+}
+
+.logs-table-container {
+  overflow-x: auto;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.logs-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+  table-layout: auto;
+  min-width: 600px; /* Ensure minimum width for readability */
+}
+
+.logs-table th,
+.logs-table td {
+  padding: 12px 15px;
+  text-align: left;
+  border-bottom: 1px solid #eee;
+  word-break: break-word;
+}
+
+.logs-table th {
+  background-color: #f8f9fa;
+  font-weight: 600;
+  color: #555;
+  position: sticky;
+  top: 0;
+}
+
+.logs-table tr:hover {
+  background-color: #f5f5f5;
+}
+
+.logs-table a {
+  color: #1976d2;
+  text-decoration: none;
+}
+
+.logs-table a:hover {
+  text-decoration: underline;
+}
+
+.status-badge {
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 0.8rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.status-success {
+  background-color: #e8f5e9;
+  color: #2e7d32;
+}
+
+.status-failed {
+  background-color: #ffebee;
+  color: #c62828;
+}
+
+.status-skipped {
+  background-color: #fff3e0;
+  color: #ef6c00;
+}
+
+.status-dry-run {
+  background-color: #e3f2fd;
+  color: #1565c0;
+}
+
+.error-message {
+  color: #c62828;
+  font-size: 0.8rem;
+}
+
+.no-logs {
+  text-align: center;
+  padding: 40px 20px;
+  color: #666;
+}
+
+.no-logs p {
+  margin: 0;
+  font-style: italic;
+}
+
+/* Responsive improvements */
+@media (max-width: 768px) {
+  .logs-table {
+    font-size: 0.8rem;
+  }
+  
+  .logs-table th,
+  .logs-table td {
+    padding: 8px 10px;
+  }
+  
+  .status-badge {
+    font-size: 0.7rem;
+    padding: 3px 6px;
+  }
+}
+
+@media (max-width: 576px) {
+  .job-logs h3 {
+    font-size: 1.2rem;
+    padding-bottom: 8px;
+  }
+  
+  .logs-table {
+    font-size: 0.7rem;
+  }
+  
+  .logs-table th,
+  .logs-table td {
+    padding: 6px 8px;
+  }
+  
+  .logs-table th {
+    font-size: 0.75rem;
+  }
+  
+  .status-badge {
+    font-size: 0.65rem;
+    padding: 2px 5px;
+  }
+  
+  .error-message {
+    font-size: 0.7rem;
+  }
+}
+
+@media (max-width: 400px) {
+  .logs-table {
+    font-size: 0.65rem;
+  }
+  
+  .logs-table th,
+  .logs-table td {
+    padding: 5px 6px;
+  }
+  
+  .status-badge {
+    font-size: 0.6rem;
+    padding: 1px 4px;
+  }
+}
+
+/* Specific fixes for problem widths */
+@media (min-width: 1035px) and (max-width: 1099px) {
+  .logs-table {
+    font-size: 1rem;
+  }
+  
+  .logs-table th,
+  .logs-table td {
+    padding: 14px 18px;
+  }
+  
+  .status-badge {
+    font-size: 0.85rem;
+    padding: 5px 8px;
+  }
+}
+
+@media (min-width: 1200px) and (max-width: 1299px) {
+  .logs-table {
+    font-size: 1.05rem;
+  }
+  
+  .logs-table th,
+  .logs-table td {
+    padding: 16px 20px;
+  }
+  
+  .status-badge {
+    font-size: 0.9rem;
+    padding: 6px 10px;
+  }
+}
+
+/* Fixes for larger screens */
+@media (min-width: 1100px) and (max-width: 1199px) {
+  .logs-table {
+    font-size: 1rem;
+  }
+  
+  .logs-table th,
+  .logs-table td {
+    padding: 15px 20px;
+  }
+  
+  .status-badge {
+    font-size: 0.9rem;
+    padding: 6px 10px;
+  }
+}
+
+@media (min-width: 1300px) {
+  .logs-table {
+    font-size: 1.1rem;
+  }
+  
+  .logs-table th,
+  .logs-table td {
+    padding: 18px 25px;
+  }
+  
+  .status-badge {
+    font-size: 1rem;
+    padding: 8px 12px;
+  }
+}

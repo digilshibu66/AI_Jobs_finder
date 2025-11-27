@@ -1,9 +1,0 @@
-requests
-beautifulsoup4
-lxml
-PyPDF2
-faiss-cpu
-google-generativeai
-openpyxl
-pandas
-python-dotenv

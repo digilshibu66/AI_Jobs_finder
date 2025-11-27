@@ -157,3 +157,21 @@ Thumbs.db
 
 # Resume files (avoid committing personal data)
 *.pdf
+
+# Node.js / npm
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Frontend build artifacts
+/frontend/dist/
+/frontend/.vite/
+/frontend/.cache/
+
+# Backup files
+*.backup
+*.bak
+
+# Test files
+test_*.py

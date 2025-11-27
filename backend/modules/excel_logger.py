@@ -6,7 +6,7 @@ from pathlib import Path
 
 
 class EmailLogger:
-    def __init__(self, log_file_path="email_log.xlsx"):
+    def __init__(self, log_file_path="../email_log.xlsx"):
         self.log_file_path = log_file_path
         self.columns = [
             "timestamp",

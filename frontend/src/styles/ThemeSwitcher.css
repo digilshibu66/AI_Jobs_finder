@@ -1,0 +1,30 @@
+.theme-switcher {
+  transition: all 0.3s ease;
+  font-weight: 600;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  padding: 8px 16px;
+  border: none;
+  border-radius: 20px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+/* Responsive improvements */
+@media (max-width: 576px) {
+  .theme-switcher {
+    padding: 6px 12px;
+    font-size: 0.9rem;
+    gap: 6px;
+  }
+}
+
+@media (max-width: 400px) {
+  .theme-switcher {
+    padding: 5px 10px;
+    font-size: 0.8rem;
+    gap: 4px;
+  }
+}

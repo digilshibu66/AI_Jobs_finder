@@ -119,7 +119,7 @@ def find_company_email_with_gemini(job_data):
     skills = ', '.join(job_data.get('skills', [])[:5])
     source_url = job_data.get('source', '')
     
-    print(f"  🔍 Searching for contact email using Gemini AI...")
+    print(f"  [SEARCH] Searching for contact email using Gemini AI...")
     
     try:
         # Use Gemini 2.0 Flash with Google Search grounding
@@ -172,15 +172,15 @@ Return format: Just the email address, nothing else.
             # Validate email is not a common invalid pattern
             invalid_patterns = ['noreply', 'no-reply', 'donotreply', 'example.com', 'test.com']
             if not any(pattern in email.lower() for pattern in invalid_patterns):
-                print(f"  ✓ Found valid email: {email}")
+                print(f"  [FOUND] Found valid email: {email}")
                 return email
             else:
-                print(f"  ⚠ Email found but appears invalid: {email}")
+                print(f"  [WARNING] Email found but appears invalid: {email}")
         else:
-            print(f"  ✗ No email found via Gemini Search")
+            print(f"  [NOT_FOUND] No email found via Gemini Search")
     
     except Exception as e:
-        print(f"  ✗ Gemini search error: {e}")
+        print(f"  [ERROR] Gemini search error: {e}")
     
     return None
 
@@ -262,11 +262,11 @@ If not found, return: NOT_FOUND
             email = extract_email(result)
             
             if email and 'NOT_FOUND' not in result.upper():
-                print(f"  ✓ Found email via Gemini: {email}")
+                print(f"  [FOUND] Found email via Gemini: {email}")
                 return email
         
         except Exception as e:
-            print(f"  ✗ Gemini search failed: {e}")
+            print(f"  [ERROR] Gemini search failed: {e}")
     
     # Strategy 2: Try Google Custom Search API (if configured)
     api_key = os.environ.get("GOOGLE_SEARCH_API_KEY")
@@ -274,7 +274,7 @@ If not found, return: NOT_FOUND
     
     if api_key and cx:
         try:
-            print(f"  🔍 Trying Google Custom Search API...")
+            print(f"  [SEARCH] Trying Google Custom Search API...")
             query = f"{company_name} contact email careers jobs hr"
             search_results = google_search(query)
             
@@ -287,7 +287,7 @@ If not found, return: NOT_FOUND
                 # Check snippet for email first
                 email = extract_email(snippet)
                 if email:
-                    print(f"  ✓ Found email in search snippet: {email}")
+                    print(f"  [FOUND] Found email in search snippet: {email}")
                     return email
                 
                 # Add URL to check list
@@ -300,19 +300,19 @@ If not found, return: NOT_FOUND
             if urls_to_check:
                 email = scrape_multiple_urls_for_email(urls_to_check[:3])
                 if email:
-                    print(f"  ✓ Found email from website: {email}")
+                    print(f"  [FOUND] Found email from website: {email}")
                     return email
         
         except Exception as e:
-            print(f"  ✗ Google Search API failed: {e}")
+            print(f"  [ERROR] Google Search API failed: {e}")
     
     # Strategy 3: Generate common email patterns
     if company_name and company_name != "Freelancer.com Client":
         # Don't generate fallback for platform companies or unknown clients
         platform_indicators = ['client', 'freelancer.com', 'upwork', 'guru', 'fiverr']
         if any(indicator in company_name.lower() for indicator in platform_indicators):
-            print(f"  ⚠ Company '{company_name}' appears to be a platform or unknown client")
-            print(f"  ✗ Not generating fallback email for platform")
+            print(f"  [WARNING] Company '{company_name}' appears to be a platform or unknown client")
+            print(f"  [SKIP] Not generating fallback email for platform")
             return None
         
         clean_name = re.sub(r'[^a-zA-Z0-9]', '', company_name).lower()
@@ -330,7 +330,7 @@ If not found, return: NOT_FOUND
             
             # Return first pattern as best guess
             fallback = common_patterns[0]
-            print(f"  ⚠ Using fallback email pattern: {fallback}")
+            print(f"  [WARNING] Using fallback email pattern: {fallback}")
             return fallback
     
     return None

@@ -81,7 +81,7 @@ def scrape_google_jobs(limit=10, job_type='software'):
         - Link (LinkedIn/Direct website)
     """
 
-    print(f"\n🔍 Searching Google Jobs / LinkedIn listings for freelance {job_type} jobs...")
+    print(f"\n[SEARCH] Searching Google Jobs / LinkedIn listings for freelance {job_type} jobs...")
 
     queries = [
         f"Freelance {job_type} jobs remote",
@@ -520,7 +520,7 @@ def scrape_google_normal_jobs(limit=10, job_type='software'):
 
 def scrape_jobs(limit=30, job_type='software', job_category='freelance'):
     """ Scrape jobs based on type and category """
-    print(f"\n🚀 Starting {job_category.title()} {job_type.title()} Job Scraping...")
+    print(f"\n[SCRAPING] Starting {job_category.title()} {job_type.title()} Job Scraping...")
 
     results = []
 
@@ -557,5 +557,5 @@ def scrape_jobs(limit=30, job_type='software', job_category='freelance'):
             unique.append(j)
             seen.add(key)
 
-    print(f"\n✅ TOTAL {job_category.upper()} JOBS COLLECTED: {len(unique)}")
+    print(f"\n[TOTAL] TOTAL {job_category.upper()} JOBS COLLECTED: {len(unique)}")
     return unique[:limit]

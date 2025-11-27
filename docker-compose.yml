@@ -1,0 +1,31 @@
+services:
+  jobs-mail-sender:
+    build: .
+    container_name: jobs-mail-sender
+    volumes:
+      # Mount the current directory to access resumes and generated files
+      - .:/app/data
+      # Mount the resume file specifically (adjust path as needed)
+      - ./resume.pdf:/app/resume.pdf
+    environment:
+      # Set your environment variables here
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - SMTP_EMAIL=${SMTP_EMAIL}
+      - SMTP_PASSWORD=${SMTP_PASSWORD}
+      - RESUME_PATH=/app/resume.pdf
+      - SEND_EMAILS=false
+      - JOB_TYPE=software
+      - JOB_CATEGORY=freelance
+      - JOB_LIMIT=5
+      - GENERATE_MOTIVATIONAL_LETTER=true
+    ports:
+      - "5000:5000"  # Backend API
+    command: [
+      "python", "backend/server.py"
+    ]
+
+  redis:
+    image: redis:latest
+    container_name: jobs-mail-sender-redis
+    ports:
+      - "6380:6379"  # Changed port to avoid conflicts

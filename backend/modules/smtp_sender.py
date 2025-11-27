@@ -8,7 +8,7 @@ import os
 SMTP_SERVER = os.environ.get('SMTP_SERVER', 'smtp.gmail.com')
 SMTP_PORT = int(os.environ.get('SMTP_PORT', 587))
 
-def send_email(sender_email, sender_password, to_email, subject, body, attachment_path=None):
+def send_email(sender_email, sender_password, to_email, subject, body, attachment_paths=None):
     if not to_email:
         raise ValueError('to_email is required')
 
@@ -18,11 +18,15 @@ def send_email(sender_email, sender_password, to_email, subject, body, attachmen
     msg['Subject'] = subject
     msg.attach(MIMEText(body, 'plain'))
 
-    if attachment_path:
-        with open(attachment_path, 'rb') as f:
-            part = MIMEApplication(f.read(), _subtype='pdf')
-            part.add_header('Content-Disposition', 'attachment', filename='Resume.pdf')
-            msg.attach(part)
+    # Handle multiple attachments
+    if attachment_paths:
+        for attachment_path in attachment_paths:
+            if attachment_path and os.path.exists(attachment_path):
+                filename = os.path.basename(attachment_path)
+                with open(attachment_path, 'rb') as f:
+                    part = MIMEApplication(f.read(), _subtype='pdf')
+                    part.add_header('Content-Disposition', 'attachment', filename=filename)
+                    msg.attach(part)
 
     server = smtplib.SMTP(SMTP_SERVER, SMTP_PORT)
     server.starttls()
