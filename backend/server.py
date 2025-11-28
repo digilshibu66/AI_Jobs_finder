@@ -5,11 +5,13 @@ from datetime import datetime
 import subprocess
 import sys
 from dotenv import set_key, load_dotenv
+import numpy as np
 
 app = Flask(__name__, static_folder='../frontend/dist')
 
-# Path to the Excel log file
-EXCEL_FILE_PATH = os.path.join('..', 'email_log.xlsx')
+# Path to the Excel log file - FIXED PATH ISSUE
+# Use /app/email_log.xlsx as the default path
+EXCEL_FILE_PATH = '/app/email_log.xlsx'
 
 # Get the backend directory path
 BACKEND_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -27,12 +29,17 @@ def serve_frontend(path):
 def read_excel_data():
     """Read data from the Excel log file"""
     try:
+        print(f"Looking for Excel file at: {EXCEL_FILE_PATH}")
         if os.path.exists(EXCEL_FILE_PATH):
             df = pd.read_excel(EXCEL_FILE_PATH)
+            print(f"Found {len(df)} records in Excel file")
+            # Handle NaN values by replacing them with empty strings
+            df = df.replace({np.nan: ''})
             # Convert DataFrame to list of dictionaries
             data = df.to_dict('records')
             return data
         else:
+            print(f"Excel file not found at: {EXCEL_FILE_PATH}")
             return []
     except Exception as e:
         print(f"Error reading Excel file: {e}")
@@ -41,10 +48,11 @@ def read_excel_data():
 def get_statistics(logs):
     """Calculate statistics from logs"""
     total = len(logs)
-    success = sum(1 for log in logs if log.get('Status') == 'SUCCESS')
-    failed = sum(1 for log in logs if log.get('Status') == 'FAILED')
-    skipped = sum(1 for log in logs if log.get('Status') == 'SKIPPED')
-    dry_run = sum(1 for log in logs if log.get('Status') == 'DRY_RUN')
+    # Use lowercase 'status' to match the Excel column name
+    success = sum(1 for log in logs if log.get('status', '').upper() == 'SUCCESS')
+    failed = sum(1 for log in logs if log.get('status', '').upper() == 'FAILED')
+    skipped = sum(1 for log in logs if log.get('status', '').upper() == 'SKIPPED')
+    dry_run = sum(1 for log in logs if log.get('status', '').upper() == 'DRY_RUN')
     
     return {
         'totalJobs': total,

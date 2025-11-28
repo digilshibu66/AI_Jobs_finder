@@ -108,6 +108,10 @@ def run(resume_path, smtp_email, smtp_password, dry_run=True, generate_motivatio
     print("Resume text loaded.")
     # Note: We're not printing resume_text directly to avoid Unicode encoding issues
 
+    # Create motivational letters directory if it doesn't exist
+    motivational_letters_dir = os.path.join(os.path.dirname(resume_path), 'motivational_letters')
+    os.makedirs(motivational_letters_dir, exist_ok=True)
+
     print("Scraping jobs...")
     jobs = scrape_jobs(limit=args.job_limit, job_type=args.job_type, job_category=args.job_category)
     print(f"Found {len(jobs)} {args.job_category} job(s) for '{args.job_type}' type.")
@@ -133,10 +137,10 @@ def run(resume_path, smtp_email, smtp_password, dry_run=True, generate_motivatio
             try:
                 print("Generating motivational letter...")
                 letter_content = generate_motivational_letter(job['title'], job.get('description',''), resume_text)
-                # Save motivational letter as PDF
+                # Save motivational letter as PDF in the motivational_letters folder
                 letter_filename = f"motivational_letter_{job['title'][:30].replace(' ', '_').replace('/', '_')}.pdf"
                 letter_filename = re.sub(r'[<>:"/\\|?*]', '_', letter_filename)  # Remove invalid characters
-                motivational_letter_path = os.path.join(os.path.dirname(resume_path), letter_filename)
+                motivational_letter_path = os.path.join(motivational_letters_dir, letter_filename)
                 motivational_letter_path = save_motivational_letter_as_pdf(letter_content, motivational_letter_path)
                 print(f"[SUCCESS] Motivational letter generated: {motivational_letter_path}")
             except Exception as e:
@@ -274,8 +278,8 @@ if __name__ == '__main__':
     parser.add_argument('--job-category', default=config['job_category'], choices=['freelance', 'normal'], help='Job category (default: freelance)')
     parser.add_argument('--job-limit', type=int, default=config['job_limit'], help='Number of jobs to process (default: 30)')
     parser.add_argument('--keywords', default='', help='Keywords to search for (comma-separated)')
-    parser.add_argument('--job-field', default='tech', help='Job field to search for (tech, marketing, design, business, healthcare, finance, other)')
-    parser.add_argument('--generate-motivational-letter', action='store_true', default=config['motivational_letter'], help='Generate motivational letter (default: true)')
+    parser.add_argument('--job-field', default='tech', help='Job field to search for (tech, marketing, design, business, healthcare, finance, education, legal, manufacturing, hospitality, nonprofit, pharma, agriculture, construction, retail, other)')
+    parser.add_argument('--generate-motivational-letter', action='store_true', default=config['motivational_letter'], help='Generate motivational letter (default: true)' )
     
     args = parser.parse_args()
     

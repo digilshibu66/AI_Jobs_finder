@@ -53,19 +53,19 @@ const JobLogs = ({ logs }) => {
               <tr key={log.id} style={{ borderBottom: `1px solid ${theme.colors.border}` }}>
                 <td style={{ padding: '12px', color: theme.colors.text }}>{log.timestamp}</td>
                 <td style={{ padding: '12px', color: theme.colors.primary }}>
-                  <a href={log.sourceUrl} target="_blank" rel="noopener noreferrer" style={{ color: theme.colors.secondary, textDecoration: 'none' }}>
-                    {log.jobTitle}
+                  <a href={log.source_url} target="_blank" rel="noopener noreferrer" style={{ color: theme.colors.secondary, textDecoration: 'none' }}>
+                    {log.job_title}
                   </a>
                 </td>
                 <td style={{ padding: '12px', color: theme.colors.text }}>{log.company}</td>
-                <td style={{ padding: '12px', color: theme.colors.text }}>{log.recipientEmail}</td>
+                <td style={{ padding: '12px', color: theme.colors.text }}>{log.to_email}</td>
                 <td style={{ padding: '12px' }}>
                   <span className={`status-badge ${getStatusClass(log.status)}`} style={{ padding: '4px 8px', borderRadius: '4px', backgroundColor: getStatusColor(log.status, theme) }}>
                     {log.status}
                   </span>
                 </td>
                 <td className="error-message" style={{ padding: '12px', color: theme.colors.danger, fontSize: '0.85rem' }}>
-                  {log.errorMessage}
+                  {log.error_message}
                 </td>
               </tr>
             ))}

@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import JobStats from './JobStats';
 import JobRunner from './JobRunner';
-import JobLogs from './JobLogs';
 import ThemeSwitcher from './ThemeSwitcher';
 import { useTheme } from '../context/ThemeContext';
 import '../styles/Dashboard.css';
@@ -81,6 +80,11 @@ const Dashboard = () => {
     }
   };
 
+  const handleViewAllActivity = () => {
+    window.history.pushState({}, '', '/activity');
+    window.dispatchEvent(new PopStateEvent('popstate'));
+  };
+
   return (
     <div className="dashboard" style={{ backgroundColor: theme.colors.background }}>
       <div className="dashboard-header" style={{ borderBottom: `1px solid ${theme.colors.border}` }}>
@@ -103,7 +107,25 @@ const Dashboard = () => {
         </div>
         
         <div className="dashboard-section">
-          <JobLogs logs={logs} />
+          <div style={{ backgroundColor: theme.colors.surface, padding: '20px', borderRadius: '8px', boxShadow: theme.colors.cardShadow, textAlign: 'center' }}>
+            <h3 style={{ color: theme.colors.text, marginBottom: '20px' }}>Activity Logs</h3>
+            <button 
+              onClick={handleViewAllActivity}
+              style={{
+                backgroundColor: theme.colors.secondary,
+                color: theme.colors.headerText,
+                padding: '12px 24px',
+                border: 'none',
+                borderRadius: '4px',
+                cursor: 'pointer',
+                fontWeight: 'bold',
+                fontSize: '1rem'
+              }}
+            >
+              View Complete Activity Logs →
+            </button>
+            <p style={{ color: theme.colors.textSecondary, marginTop: '10px' }}>Click to view the full email activity table with search and filter options</p>
+          </div>
         </div>
       </div>
     </div>

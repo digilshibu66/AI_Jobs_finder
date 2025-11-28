@@ -134,6 +134,14 @@ const JobRunner = ({ onRunComplete }) => {
             <option value="web">Web Development</option>
             <option value="mobile">Mobile Development</option>
             <option value="data">Data Science</option>
+            <option value="healthcare">Healthcare</option>
+            <option value="finance">Finance & Banking</option>
+            <option value="education">Education</option>
+            <option value="legal">Legal</option>
+            <option value="marketing">Marketing & Sales</option>
+            <option value="manufacturing">Manufacturing & Engineering</option>
+            <option value="hospitality">Hospitality & Tourism</option>
+            <option value="nonprofit">Nonprofit & NGO</option>
           </select>
         </div>
         
@@ -152,6 +160,15 @@ const JobRunner = ({ onRunComplete }) => {
             <option value="business">Business</option>
             <option value="healthcare">Healthcare</option>
             <option value="finance">Finance</option>
+            <option value="education">Education</option>
+            <option value="legal">Legal</option>
+            <option value="manufacturing">Manufacturing</option>
+            <option value="hospitality">Hospitality</option>
+            <option value="nonprofit">Nonprofit</option>
+            <option value="pharma">Pharmaceutical</option>
+            <option value="agriculture">Agriculture</option>
+            <option value="construction">Construction</option>
+            <option value="retail">Retail & E-commerce</option>
             <option value="other">Other</option>
           </select>
         </div>

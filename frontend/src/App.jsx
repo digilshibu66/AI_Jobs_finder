@@ -1,10 +1,25 @@
 import { useState, useEffect } from 'react';
 import Dashboard from './components/Dashboard';
+import ActivityPage from './components/ActivityPage';
 import { ThemeProvider, useTheme } from './context/ThemeContext';
 import './App.css';
 
 function AppContent() {
   const { theme } = useTheme();
+  const [currentPage, setCurrentPage] = useState('dashboard');
+
+  useEffect(() => {
+    const handlePopState = () => {
+      const path = window.location.pathname;
+      setCurrentPage(path === '/activity' ? 'activity' : 'dashboard');
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    const path = window.location.pathname;
+    setCurrentPage(path === '/activity' ? 'activity' : 'dashboard');
+
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
 
   const appStyle = {
     backgroundColor: theme.colors.background,
@@ -26,7 +41,7 @@ function AppContent() {
         <h1>Jobs Mail Sender Dashboard</h1>
       </header>
       <main>
-        <Dashboard />
+        {currentPage === 'activity' ? <ActivityPage /> : <Dashboard />}
       </main>
     </div>
   );

@@ -4,10 +4,15 @@ import pandas as pd
 from datetime import datetime
 from pathlib import Path
 
-
 class EmailLogger:
-    def __init__(self, log_file_path="../email_log.xlsx"):
-        self.log_file_path = log_file_path
+    def __init__(self, log_file_path=None):
+        # Use a consistent path for the Excel file
+        if log_file_path is None:
+            # Use /app/email_log.xlsx as the default path
+            self.log_file_path = '/app/email_log.xlsx'
+        else:
+            self.log_file_path = log_file_path
+            
         self.columns = [
             "timestamp",
             "job_title",
@@ -24,9 +29,17 @@ class EmailLogger:
     def _initialize_log_file(self):
         """Create the Excel file with headers if it doesn't exist."""
         try:
+            # Ensure the directory exists
+            log_dir = os.path.dirname(self.log_file_path)
+            if log_dir and not os.path.exists(log_dir):
+                os.makedirs(log_dir)
+                
             if not os.path.exists(self.log_file_path):
                 df = pd.DataFrame(columns=self.columns)
                 df.to_excel(self.log_file_path, index=False, engine='openpyxl')
+                print(f"Created new Excel log file at: {self.log_file_path}")
+            else:
+                print(f"Excel log file already exists at: {self.log_file_path}")
         except PermissionError:
             print(f"Permission denied: Cannot create {self.log_file_path}. Please check file permissions.")
         except Exception as e:
@@ -35,11 +48,14 @@ class EmailLogger:
     def log_email(self, job_data, to_email, subject, body, status, error_message="", source_url=""):
         """Log email sending activity to Excel file."""
         try:
+            print(f"Attempting to log email to {self.log_file_path}")
             # Read existing data
             if os.path.exists(self.log_file_path):
                 existing_df = pd.read_excel(self.log_file_path, engine='openpyxl')
+                print(f"Read {len(existing_df)} existing records from Excel file")
             else:
                 existing_df = pd.DataFrame(columns=self.columns)
+                print("No existing Excel file found, creating new DataFrame")
             
             # Create new entry
             new_entry = {
@@ -71,6 +87,7 @@ class EmailLogger:
         for attempt in range(max_attempts):
             try:
                 df.to_excel(self.log_file_path, index=False, engine='openpyxl')
+                print(f"Successfully wrote {len(df)} records to Excel file")
                 return
             except PermissionError:
                 if attempt < max_attempts - 1:
