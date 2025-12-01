@@ -102,7 +102,13 @@ def is_valid_target_email(email, company_name, platform):
     
     return True
 
-def run(resume_path, smtp_email, smtp_password, dry_run=True, generate_motivational_letter_flag=True):
+def run(resume_path, smtp_email, smtp_password,
+        dry_run=True,
+        generate_motivational_letter_flag=True,
+        max_jobs=30,
+        job_type='software',
+        job_category='freelance',
+        job_field='tech'):
     print("Loading resume ->", resume_path)
     resume_text = extract_resume_text(resume_path)
     print("Resume text loaded.")
@@ -112,15 +118,41 @@ def run(resume_path, smtp_email, smtp_password, dry_run=True, generate_motivatio
     motivational_letters_dir = os.path.join(os.path.dirname(resume_path), 'motivational_letters')
     os.makedirs(motivational_letters_dir, exist_ok=True)
 
-    print("Scraping jobs...")
-    jobs = scrape_jobs(limit=args.job_limit, job_type=args.job_type, job_category=args.job_category)
-    print(f"Found {len(jobs)} {args.job_category} job(s) for '{args.job_type}' type.")
+    print(f"\n[SCRAPER] Looking for {job_category} {job_type} jobs (field: {job_field})...")
+    # Currently job_field is informational; job_type controls the actual scraping filters
+    scraped_jobs = scrape_jobs(limit=max_jobs*2, job_type=job_type, job_category=job_category)
+    print(f"Found {len(scraped_jobs)} jobs")
 
-    for job in jobs:
+    if not scraped_jobs:
+        print("No jobs found. Exiting...")
+        return
+    
+    # Filter out already processed jobs
+    jobs = []
+    for job in scraped_jobs:
+        if not email_logger.is_job_processed(job):
+            jobs.append(job)
+            # Log the job as scraped (but not yet processed for email)
+            email_logger.log_job(job, email_sent=False, status="scraped")
+    
+    print(f"Found {len(jobs)} new jobs to process (skipping {len(scraped_jobs) - len(jobs)} already processed jobs)")
+    
+    if not jobs:
+        print("No new jobs to process. Exiting...")
+        return
+
+    # Process each job (up to max_jobs)
+    for i, job in enumerate(jobs[:max_jobs], 1):
+        job_title = job.get('title', 'Untitled')
+        company = job.get('company', 'Unknown Company')
         print("\n" + "="*80)
-        print(f"Processing Job: {job['title'][:70]}")
-        print(f"Platform: {job['platform']} | Budget: {job.get('budget', 'N/A')}")
+        print(f"Processing job {i}/{min(len(jobs), max_jobs)}: {job_title} at {company}")
+        if 'platform' in job:
+            print(f"Platform: {job['platform']} | Budget: {job.get('budget', 'N/A')}")
         print("="*80)
+        
+        # Update job status to processing
+        email_logger.log_job(job, email_sent=False, status="processing")
         
         # Create personalized email body using resume
         try:
@@ -130,6 +162,9 @@ def run(resume_path, smtp_email, smtp_password, dry_run=True, generate_motivatio
         except Exception as e:
             print(f"[ERROR] Error generating email body: {e}")
             continue
+        
+        # Common subject used for all logging paths
+        subject = f"Application for {job['title']} position"
             
         # Generate motivational letter if requested
         motivational_letter_path = None
@@ -157,9 +192,35 @@ def run(resume_path, smtp_email, smtp_password, dry_run=True, generate_motivatio
             try:
                 # Pass full job data to the email finder for better search results
                 to_email = find_company_email(job['title'], job.get('company',''), job_data=job)
+                
+                if not to_email:
+                    print("  [INFO] No valid email found for this job")
+                    # Log as skipped since we cannot find any email
+                    email_logger.log_email(
+                        job_data=job,
+                        to_email="",
+                        subject=subject,
+                        body=body,
+                        status="SKIPPED",
+                        error_message="No valid email found for this job",
+                        source_url=job.get('source', '')
+                    )
+                    continue
+                    
             except Exception as e:
-                print(f"  [ERROR] Error finding company email: {e}")
-                to_email = None
+                error_msg = f"Error finding company email: {e}"
+                print(f"  [ERROR] {error_msg}")
+                # Treat search errors as FAILED attempts in the log
+                email_logger.log_email(
+                    job_data=job,
+                    to_email="",
+                    subject=subject,
+                    body=body,
+                    status="FAILED",
+                    error_message=error_msg,
+                    source_url=job.get('source', '')
+                )
+                continue
         
         # Validate the email - skip if it's a platform email or generic fallback
         if to_email:
@@ -167,12 +228,12 @@ def run(resume_path, smtp_email, smtp_password, dry_run=True, generate_motivatio
                 print(f"  [INVALID] Email '{to_email}' is not a valid client/company email (platform or generic)")
                 print(f"  [SKIP] Skipping - Only sending to actual company/client emails")
                 
-                # Log the skipped job
+                # Log the skipped job with subject/body for visibility
                 email_logger.log_email(
                     job_data=job,
                     to_email=to_email,
-                    subject="",
-                    body="",
+                    subject=subject,
+                    body=body,
                     status="SKIPPED",
                     error_message="Not a valid company email - platform or generic email",
                     source_url=job.get('source', '')
@@ -194,7 +255,7 @@ def run(resume_path, smtp_email, smtp_password, dry_run=True, generate_motivatio
                 email_logger.log_email(
                     job_data=job,
                     to_email="",
-                    subject="",
+                    subject=subject,
                     body=body,
                     status="SKIPPED",
                     error_message="No valid company email found - only platform email available",
@@ -203,60 +264,59 @@ def run(resume_path, smtp_email, smtp_password, dry_run=True, generate_motivatio
                 continue
             
         print(f"\nTarget Email: {to_email}")
-        subject = f"Application for {job['title'][:60]} - Experienced Developer"
 
-        if dry_run:
-            print("\n" + "-"*80)
-            print("DRY RUN MODE - Email Preview")
-            print("-"*80)
-            print(f"To: {to_email}")
-            print(f"Subject: {subject}")
-            print(f"\nBody:\n{body[:600]}...")
-            if motivational_letter_path and os.path.exists(motivational_letter_path):
-                print(f"Motivational Letter: {motivational_letter_path}")
-            print("-"*80)
+        # Prepare attachments
+        attachments = [resume_path]
+        if motivational_letter_path:
+            attachments.append(motivational_letter_path)
             
-            # Log the email attempt
-            email_logger.log_email(
-                job_data=job,
-                to_email=to_email,
-                subject=subject,
-                body=body,
-                status="DRY_RUN",
-                source_url=job.get('source', '')
-            )
-        else:
+        # Send email if we have a valid recipient
+        if to_email:
+            print(f"Sending email to {to_email}...")
+            
             try:
-                print(f"\nSending email to {to_email}...")
-                # Prepare attachments - resume and motivational letter
-                attachments = [resume_path]
-                if motivational_letter_path and os.path.exists(motivational_letter_path):
-                    attachments.append(motivational_letter_path)
+                if not dry_run:
+                    send_email(
+                        sender_email=smtp_email,
+                        sender_password=smtp_password,
+                        to_email=to_email,
+                        subject=subject,
+                        body=body,
+                        attachment_paths=attachments
+                    )
+                    # SUCCESS = real email sent
+                    status = "SUCCESS"
+                    print("Email sent successfully!")
+                else:
+                    print("[DRY RUN] Would send email to:", to_email)
+                    print("Subject:", subject)
+                    print("Body preview:", body[:200] + "...")
+                    print("Attachments:", [os.path.basename(a) for a in attachments])
+                    # DRY_RUN = simulated send only
+                    status = "DRY_RUN"
                 
-                send_email(smtp_email, smtp_password, to_email, subject, body, attachments)
-                print("[SUCCESS] Email sent successfully!")
-                
-                # Log successful email sending
+                # Log the email
                 email_logger.log_email(
                     job_data=job,
                     to_email=to_email,
                     subject=subject,
                     body=body,
-                    status="SUCCESS",
-                    source_url=job.get('source', '')
+                    status=status,
+                    source_url=job.get('url', '')
                 )
-            except Exception as e:
-                print(f"[FAILED] Failed to send email: {e}")
                 
-                # Log failed email sending
+            except Exception as e:
+                error_msg = str(e)
+                print(f"Error sending email: {error_msg}")
+                # FAILED = error while sending email
                 email_logger.log_email(
                     job_data=job,
                     to_email=to_email,
                     subject=subject,
                     body=body,
                     status="FAILED",
-                    error_message=str(e),
-                    source_url=job.get('source', '')
+                    error_message=error_msg,
+                    source_url=job.get('url', '')
                 )
     
     print("\n" + "="*80)
@@ -301,4 +361,14 @@ if __name__ == '__main__':
         print("Error: GEMINI_API_KEY environment variable is not set.")
         sys.exit(1)
     
-    run(args.resume, args.smtp_email, args.smtp_password, dry_run=not args.send, generate_motivational_letter_flag=args.generate_motivational_letter)
+    run(
+        args.resume,
+        args.smtp_email,
+        args.smtp_password,
+        dry_run=not args.send,
+        generate_motivational_letter_flag=args.generate_motivational_letter,
+        max_jobs=args.job_limit,
+        job_type=args.job_type,
+        job_category=args.job_category,
+        job_field=args.job_field,
+    )
