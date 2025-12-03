@@ -20,6 +20,12 @@ from modules.email_agent import generate_mail_body, find_company_email
 from modules.smtp_sender import send_email
 from modules.excel_logger import email_logger
 from modules.motivational_letter_generator import generate_motivational_letter, save_motivational_letter_as_pdf
+from modules.retry_handler import (
+    add_to_retry_queue,
+    should_retry_later,
+    should_retry_on_exception,
+    process_retry_queue
+)
 
 def load_config():
     """Load configuration from .env file or environment variables."""
@@ -108,7 +114,8 @@ def run(resume_path, smtp_email, smtp_password,
         max_jobs=30,
         job_type='software',
         job_category='freelance',
-        job_field='tech'):
+        job_field='tech',
+        process_retries=True):
     print("Loading resume ->", resume_path)
     resume_text = extract_resume_text(resume_path)
     print("Resume text loaded.")
@@ -276,52 +283,87 @@ def run(resume_path, smtp_email, smtp_password,
             
             try:
                 if not dry_run:
-                    send_email(
+                    # Enhanced email sending with retries and DSN
+                    send_result = send_email(
                         sender_email=smtp_email,
                         sender_password=smtp_password,
                         to_email=to_email,
                         subject=subject,
                         body=body,
-                        attachment_paths=attachments
+                        attachment_paths=attachments,
+                        enable_dsn=True,
+                        max_retries=3
                     )
-                    # SUCCESS = real email sent
-                    status = "SUCCESS"
-                    print("Email sent successfully!")
+                    
+                    if send_result.get('success'):
+                        status = "SENT"
+                        print(f"Email sent successfully! (Attempts: {send_result['retry_count']})")
+                        if send_result['retry_count'] > 1:
+                            print(f"  [NOTE] Email required {send_result['retry_count']} attempts to send")
+                    else:
+                        status = "FAILED"
+                        error_msg = send_result.get('error', 'Unknown error')
+                        print(f"Failed to send email: {error_msg}")
+                        
                 else:
+                    # Dry run mode
                     print("[DRY RUN] Would send email to:", to_email)
                     print("Subject:", subject)
                     print("Body preview:", body[:200] + "...")
                     print("Attachments:", [os.path.basename(a) for a in attachments])
-                    # DRY_RUN = simulated send only
                     status = "DRY_RUN"
                 
-                # Log the email
+                # Log the email with delivery status
                 email_logger.log_email(
                     job_data=job,
                     to_email=to_email,
                     subject=subject,
                     body=body,
                     status=status,
+                    error_message=send_result.get('error', '') if not dry_run and status == "FAILED" else '',
                     source_url=job.get('url', '')
                 )
                 
+                # If email failed to send, add to retry queue
+                if not dry_run and status == "FAILED":
+                    retry_later = should_retry_later(send_result.get('dsn'))
+                    if retry_later:
+                        print(f"  [RETRY] Will retry this email later (DSN: {send_result.get('dsn')})")
+                        # Add to retry queue (you can implement this as needed)
+                        add_to_retry_queue(job, to_email, subject, body, attachments)
+                
             except Exception as e:
                 error_msg = str(e)
-                print(f"Error sending email: {error_msg}")
-                # FAILED = error while sending email
+                print(f"Error in email process: {error_msg}")
+                
+                # Log the failure
                 email_logger.log_email(
                     job_data=job,
                     to_email=to_email,
                     subject=subject,
                     body=body,
-                    status="FAILED",
+                    status="ERROR",
                     error_message=error_msg,
                     source_url=job.get('url', '')
                 )
+                
+                # Check if we should retry based on exception type
+                if should_retry_on_exception(e):
+                    print("  [RETRY] Will retry this email due to temporary error")
+                    add_to_retry_queue(job, to_email, subject, body, attachments)
+    
+    # Process retry queue if enabled
+    if process_retries and not dry_run:
+        print("\n" + "="*80)
+        print("Processing retry queue...")
+        print("="*80)
+        retry_stats = process_retry_queue(smtp_email, smtp_password)
+        print(f"Retry queue processed: {retry_stats['succeeded']} succeeded, {retry_stats['failed']} failed")
     
     print("\n" + "="*80)
     print(f"Job Processing Complete! Processed {len(jobs)} jobs.")
-    print("Check email_log.xlsx for detailed records.")
+    if not dry_run:
+        print("Check email_log.xlsx for detailed records.")
     print("="*80)
 
 if __name__ == '__main__':
