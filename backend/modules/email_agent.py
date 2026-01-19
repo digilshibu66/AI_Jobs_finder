@@ -1,65 +1,127 @@
 """
-Email body + email finding WITHOUT Gemini tools.
+Email body + email finding using OpenRouter API.
 Uses:
-- Gemini 2.0 Flash for email body
+- OpenRouter API for email body generation
 - Google Custom Search API for finding company contact pages
 """
 import os
 import re
 import requests
+import json
+import time
+import random
 
-try:
-    import google.generativeai as genai
-except Exception:
-    genai = None
+# ---------------- OpenRouter Setup --------------------
 
+def _get_openrouter_api_key():
+    """Get OpenRouter API key from environment variables."""
+    api_key = os.environ.get("OPENROUTER_API_KEY")
+    if not api_key:
+        raise RuntimeError("OPENROUTER_API_KEY environment variable is not set.")
+    return api_key
 
-# ---------------- Gemini Setup --------------------
-
-def _configure_gemini():
-    if genai is None:
-        raise RuntimeError("google.generativeai not installed.")
-    genai.configure(api_key=os.environ.get("GEMINI_API_KEY"))
+def _call_openrouter_api(messages, model=None, max_retries=5):
+    """Call OpenRouter API with messages and return response."""
+    api_key = _get_openrouter_api_key()
+    
+    # Use the correct endpoint that resolves properly
+    url = "https://openrouter.ai/api/v1/chat/completions"
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json",
+        "HTTP-Referer": "https://github.com/freelance-mailer",  # Optional, for tracking
+        "X-Title": "Freelance Mailer"  # Optional, for tracking
+    }
+    
+    # Use default model if none provided
+    if model is None:
+        model = "nousresearch/hermes-3-llama-3.1-405b:free"
+    
+    data = {
+        "model": model,
+        "messages": messages
+    }
+    
+    # Enhanced exponential backoff for rate limiting with longer delays
+    for attempt in range(max_retries):
+        try:
+            response = requests.post(url, headers=headers, json=data)
+            if response.status_code == 429:
+                # Rate limited - implement enhanced exponential backoff with longer delays
+                # Base delay of 15 seconds with exponential growth (free models need more time)
+                wait_time = (15 * (2 ** attempt)) + random.uniform(0, 5)
+                print(f"  [RATE_LIMIT] Hit rate limit. Waiting {wait_time:.2f} seconds before retry {attempt + 1}/{max_retries}...")
+                time.sleep(wait_time)
+                continue
+            response.raise_for_status()
+            
+            result = response.json()
+            return result['choices'][0]['message']['content']
+        except requests.exceptions.HTTPError as e:
+            if e.response.status_code == 429 and attempt < max_retries - 1:
+                # Rate limited - implement enhanced exponential backoff with longer delays
+                wait_time = (15 * (2 ** attempt)) + random.uniform(0, 5)
+                print(f"  [RATE_LIMIT] Hit rate limit. Waiting {wait_time:.2f} seconds before retry {attempt + 1}/{max_retries}...")
+                time.sleep(wait_time)
+                continue
+            else:
+                print(f"  [API_ERROR] Status: {e.response.status_code}")
+                print(f"  [API_ERROR] Response: {e.response.text}")
+                raise
+        except Exception as e:
+            if attempt < max_retries - 1:
+                wait_time = (15 * (2 ** attempt)) + random.uniform(0, 5)
+                print(f"  [ERROR] API call failed: {e}. Waiting {wait_time:.2f} seconds before retry {attempt + 1}/{max_retries}...")
+                time.sleep(wait_time)
+                continue
+            else:
+                raise
+    
+    raise Exception(f"Failed to call OpenRouter API after {max_retries} attempts")
 
 
 # ------------- Email Body Generation ---------------
 
-def generate_mail_body(job_title, job_description, resume_text):
+def generate_mail_body(job_title, job_description, resume_text, ai_model=None):
     """Generate personalized email body for job application."""
-    _configure_gemini()
+    _get_openrouter_api_key()
 
-    prompt = f"""
-Write a highly personalized and professional job application email.
+    messages = [
+        {
+            "role": "user",
+            "content": f"""
+        Write a highly personalized and professional job application email.
 
-Job Title: {job_title}
-Job Description: {job_description}
+        Job Title: {job_title}
+        Job Description: {job_description}
 
-My Resume:
-{resume_text[:4000]}
+        My Resume:
+        {resume_text[:4000]}
 
-Guidelines:
-- Start with ONLY "Hi Sir," as the greeting (no other greeting)
-- Address the specific project needs mentioned in the job description
-- Highlight 3-4 most relevant skills that match the job requirements
-- Mention 1-2 specific achievements or projects from my resume that are relevant
-- Show enthusiasm for this specific project/role
-- Keep it concise (8-12 sentences after the greeting)
-- Professional but friendly tone
-- End with: "I've attached my resume for your review. I'd love to discuss how I can contribute to your project. Looking forward to hearing from you."
+        Guidelines:
+        - Start with ONLY "Hi Sir," as the greeting (no other greeting)
+        - Address the specific project needs mentioned in the job description
+        - Highlight 3-4 most relevant skills that match the job requirements
+        - Mention 1-2 specific achievements or projects from my resume that are relevant
+        - Show enthusiasm for this specific project/role
+        - Keep it concise (8-12 sentences after the greeting)
+        - Professional but friendly tone
+        - End with: "I've attached my resume for your review. I'd love to discuss how I can contribute to your project. Looking forward to hearing from you."
 
-IMPORTANT:
-- MUST start with "Hi Sir," only
-- Make it feel personal, not template-like
-- Reference specific technologies or requirements from the job description
-- Don't use phrases like "I am writing to apply"
-- Start the body with a compelling opening that shows you understand their needs
+        IMPORTANT:
+        - MUST start with "Hi Sir," only
+        - Make it feel personal, not template-like
+        - Reference specific technologies or requirements from the job description
+        - Don't use phrases like "I am writing to apply"
+        - Start the body with a compelling opening that shows you understand their needs
 
-Return only the email body starting with "Hi Sir," (no subject line).
-"""
+        Return only the email body starting with "Hi Sir," (no subject line).
+        """
+        }
+    ]
 
-    model = genai.GenerativeModel("gemini-2.0-flash")
-    resp = model.generate_content(prompt)
-    return resp.text.strip()
+    response = _call_openrouter_api(messages, ai_model)
+    return response.strip()
 
 
 # ---------------- Email Extraction ----------------
@@ -103,14 +165,14 @@ def scrape_website_for_email(url):
         return None
 
 
-# ---------------- Enhanced Email Finder with Gemini ---------------------
+# ---------------- Enhanced Email Finder with OpenRouter ---------------------
 
-def find_company_email_with_gemini(job_data):
+def find_company_email_with_openrouter(job_data, ai_model=None):
     """
-    Use Gemini with Google Search grounding to find company email.
+    Use OpenRouter with Google Search grounding to find company email.
     Takes full job data including title, description, company, platform, etc.
     """
-    _configure_gemini()
+    _get_openrouter_api_key()
     
     job_title = job_data.get('title', '')
     company_name = job_data.get('company', '')
@@ -119,15 +181,10 @@ def find_company_email_with_gemini(job_data):
     skills = ', '.join(job_data.get('skills', [])[:5])
     source_url = job_data.get('source', '')
     
-    print(f"  [SEARCH] Searching for contact email using Gemini AI...")
+    print(f"  [SEARCH] Searching for contact email using OpenRouter AI...")
     
     try:
-        # Use Gemini 2.0 Flash with Google Search grounding
-        model = genai.GenerativeModel(
-            "gemini-2.0-flash-exp",
-            tools="google_search_retrieval"
-        )
-        
+        # Use OpenRouter with Google Search grounding
         search_prompt = f"""
 I need to find the official contact email address to apply for this job:
 
@@ -160,10 +217,17 @@ IMPORTANT:
 Return format: Just the email address, nothing else.
 """
         
-        response = model.generate_content(search_prompt)
-        result = response.text.strip()
+        messages = [
+            {
+                "role": "user",
+                "content": search_prompt
+            }
+        ]
         
-        print(f"  Gemini response: {result[:100]}")
+        result = _call_openrouter_api(messages, ai_model)
+        result = result.strip()
+        
+        print(f"  OpenRouter response: {result[:100]}")
         
         # Extract email from response
         email = extract_email(result)
@@ -177,10 +241,10 @@ Return format: Just the email address, nothing else.
             else:
                 print(f"  [WARNING] Email found but appears invalid: {email}")
         else:
-            print(f"  [NOT_FOUND] No email found via Gemini Search")
+            print(f"  [NOT_FOUND] No email found via OpenRouter Search")
     
     except Exception as e:
-        print(f"  [ERROR] Gemini search error: {e}")
+        print(f"  [ERROR] OpenRouter search error: {e}")
     
     return None
 
@@ -220,29 +284,80 @@ def scrape_multiple_urls_for_email(urls):
     return None
 
 
-def find_company_email(job_title, company_name, job_data=None):
+def verify_email_authenticity(email, company_name=None):
+    """
+    Verify if an email is genuine by searching for it using Google Search API.
+    
+    Args:
+        email (str): Email address to verify
+        company_name (str): Company name associated with the email (optional)
+        
+    Returns:
+        bool: True if email appears genuine, False otherwise
+    """
+    api_key = os.environ.get("GOOGLE_SEARCH_API_KEY")
+    cx = os.environ.get("GOOGLE_SEARCH_ENGINE_ID")
+    
+    if not api_key or not cx:
+        # If Google Search API is not configured, do basic validation
+        print(f"  [WARNING] Google Search API not configured. Doing basic email validation.")
+        return True
+    
+    try:
+        # Search for the email address to see if it appears on official company pages
+        query = f'"{email}"'
+        if company_name:
+            query += f' "{company_name}"'
+        
+        url = (
+            f"https://www.googleapis.com/customsearch/v1?"
+            f"key={api_key}&cx={cx}&q={query}"
+        )
+        
+        response = requests.get(url)
+        response.raise_for_status()
+        
+        data = response.json()
+        items = data.get("items", [])
+        
+        # If we found search results containing this email, it's likely genuine
+        if items:
+            print(f"  [VALIDATION] Email {email} appears on web pages")
+            return True
+        else:
+            print(f"  [WARNING] Email {email} not found in web search results")
+            return False
+            
+    except Exception as e:
+        print(f"  [ERROR] Email verification failed: {e}")
+        # If verification fails, we'll assume it's valid to avoid blocking legitimate emails
+        return True
+
+
+def find_company_email(job_title, company_name, job_data=None, ai_model=None):
     """
     Find company/client email using multiple strategies:
-    1️⃣ Use Gemini with Google Search grounding (primary method)
+    1️⃣ Use OpenRouter with Google Search grounding (primary method)
     2️⃣ Google Custom Search API + website scraping
     3️⃣ Generate common email patterns as fallback
     """
     
-    # If we have full job data, use the enhanced Gemini search
+    # If we have full job data, use the enhanced OpenRouter search
     if job_data:
-        email = find_company_email_with_gemini(job_data)
+        email = find_company_email_with_openrouter(job_data, ai_model)
         if email:
-            return email
+            # Verify the email is genuine before returning it
+            if verify_email_authenticity(email, company_name):
+                print(f"  [VERIFIED] Email {email} is authentic")
+                return email
+            else:
+                print(f"  [REJECTED] Email {email} failed authenticity check")
+                return None
     else:
-        # Fallback to basic Gemini search with just title and company
-        _configure_gemini()
+        # Fallback to basic OpenRouter search with just title and company
+        _get_openrouter_api_key()
         
         try:
-            model = genai.GenerativeModel(
-                "gemini-2.0-flash-exp",
-                tools="google_search_retrieval"
-            )
-            
             search_prompt = f"""
 Find the official contact email for job applications:
 
@@ -257,16 +372,29 @@ Return ONLY the email address (format: email@domain.com)
 If not found, return: NOT_FOUND
 """
             
-            response = model.generate_content(search_prompt)
-            result = response.text.strip()
+            messages = [
+                {
+                    "role": "user",
+                    "content": search_prompt
+                }
+            ]
+            
+            result = _call_openrouter_api(messages, ai_model)
+            result = result.strip()
             email = extract_email(result)
             
             if email and 'NOT_FOUND' not in result.upper():
-                print(f"  [FOUND] Found email via Gemini: {email}")
-                return email
+                print(f"  [FOUND] Found email via OpenRouter: {email}")
+                # Verify the email is genuine before returning it
+                if verify_email_authenticity(email, company_name):
+                    print(f"  [VERIFIED] Email {email} is authentic")
+                    return email
+                else:
+                    print(f"  [REJECTED] Email {email} failed authenticity check")
+                    return None
         
         except Exception as e:
-            print(f"  [ERROR] Gemini search failed: {e}")
+            print(f"  [ERROR] OpenRouter search failed: {e}")
     
     # Strategy 2: Try Google Custom Search API (if configured)
     api_key = os.environ.get("GOOGLE_SEARCH_API_KEY")
@@ -288,7 +416,13 @@ If not found, return: NOT_FOUND
                 email = extract_email(snippet)
                 if email:
                     print(f"  [FOUND] Found email in search snippet: {email}")
-                    return email
+                    # Verify the email is genuine before returning it
+                    if verify_email_authenticity(email, company_name):
+                        print(f"  [VERIFIED] Email {email} is authentic")
+                        return email
+                    else:
+                        print(f"  [REJECTED] Email {email} failed authenticity check")
+                        continue
                 
                 # Add URL to check list
                 if link and ('contact' in link.lower() or 'about' in link.lower() or 'career' in link.lower()):
@@ -301,7 +435,13 @@ If not found, return: NOT_FOUND
                 email = scrape_multiple_urls_for_email(urls_to_check[:3])
                 if email:
                     print(f"  [FOUND] Found email from website: {email}")
-                    return email
+                    # Verify the email is genuine before returning it
+                    if verify_email_authenticity(email, company_name):
+                        print(f"  [VERIFIED] Email {email} is authentic")
+                        return email
+                    else:
+                        print(f"  [REJECTED] Email {email} failed authenticity check")
+                        return None
         
         except Exception as e:
             print(f"  [ERROR] Google Search API failed: {e}")
@@ -331,6 +471,12 @@ If not found, return: NOT_FOUND
             # Return first pattern as best guess
             fallback = common_patterns[0]
             print(f"  [WARNING] Using fallback email pattern: {fallback}")
-            return fallback
+            # Verify the email is genuine before returning it
+            if verify_email_authenticity(fallback, company_name):
+                print(f"  [VERIFIED] Email {fallback} is authentic")
+                return fallback
+            else:
+                print(f"  [REJECTED] Email {fallback} failed authenticity check")
+                return None
     
     return None

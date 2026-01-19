@@ -46,7 +46,10 @@ def load_config():
         'job_type': os.getenv('JOB_TYPE', 'software'),
         'job_category': os.getenv('JOB_CATEGORY', 'freelance'),  # freelance or normal
         'job_limit': int(os.getenv('JOB_LIMIT', '30')),
-        'motivational_letter': os.getenv('GENERATE_MOTIVATIONAL_LETTER', 'true').lower() == 'true'
+        'motivational_letter': os.getenv('GENERATE_MOTIVATIONAL_LETTER', 'true').lower() == 'true',
+        'ai_model': os.getenv('AI_MODEL', 'nousresearch/hermes-3-llama-3.1-405b:free'),
+        'location': os.getenv('LOCATION'),
+        'job_name': os.getenv('JOB_NAME')
     }
     
     return config
@@ -115,6 +118,9 @@ def run(resume_path, smtp_email, smtp_password,
         job_type='software',
         job_category='freelance',
         job_field='tech',
+        ai_model='nousresearch/hermes-3-llama-3.1-405b:free',
+        location=None,
+        job_name=None,
         process_retries=True):
     print("Loading resume ->", resume_path)
     resume_text = extract_resume_text(resume_path)
@@ -125,9 +131,9 @@ def run(resume_path, smtp_email, smtp_password,
     motivational_letters_dir = os.path.join(os.path.dirname(resume_path), 'motivational_letters')
     os.makedirs(motivational_letters_dir, exist_ok=True)
 
-    print(f"\n[SCRAPER] Looking for {job_category} {job_type} jobs (field: {job_field})...")
-    # Currently job_field is informational; job_type controls the actual scraping filters
-    scraped_jobs = scrape_jobs(limit=max_jobs*2, job_type=job_type, job_category=job_category)
+    print(f"\n[SCRAPER] Looking for {job_category} jobs...")
+    # For normal jobs, we prioritize job_name, for freelance jobs we use job_type
+    scraped_jobs = scrape_jobs(limit=max_jobs*2, job_type=job_type, job_category=job_category, location=location, job_name=job_name)
     print(f"Found {len(scraped_jobs)} jobs")
 
     if not scraped_jobs:
@@ -164,7 +170,7 @@ def run(resume_path, smtp_email, smtp_password,
         # Create personalized email body using resume
         try:
             print("Generating personalized email...")
-            body = generate_mail_body(job['title'], job.get('description',''), resume_text)
+            body = generate_mail_body(job['title'], job.get('description',''), resume_text, ai_model)
             print("[SUCCESS] Email generated successfully")
         except Exception as e:
             print(f"[ERROR] Error generating email body: {e}")
@@ -178,7 +184,7 @@ def run(resume_path, smtp_email, smtp_password,
         if generate_motivational_letter_flag:
             try:
                 print("Generating motivational letter...")
-                letter_content = generate_motivational_letter(job['title'], job.get('description',''), resume_text)
+                letter_content = generate_motivational_letter(job['title'], job.get('description',''), resume_text, ai_model)
                 # Save motivational letter as PDF in the motivational_letters folder
                 letter_filename = f"motivational_letter_{job['title'][:30].replace(' ', '_').replace('/', '_')}.pdf"
                 letter_filename = re.sub(r'[<>:"/\\|?*]', '_', letter_filename)  # Remove invalid characters
@@ -198,7 +204,7 @@ def run(resume_path, smtp_email, smtp_password,
             print(f"  [SEARCH] Searching for contact email...")
             try:
                 # Pass full job data to the email finder for better search results
-                to_email = find_company_email(job['title'], job.get('company',''), job_data=job)
+                to_email = find_company_email(job['title'], job.get('company',''), job_data=job, ai_model=ai_model)
                 
                 if not to_email:
                     print("  [INFO] No valid email found for this job")
@@ -331,7 +337,6 @@ def run(resume_path, smtp_email, smtp_password,
                         print(f"  [RETRY] Will retry this email later (DSN: {send_result.get('dsn')})")
                         # Add to retry queue (you can implement this as needed)
                         add_to_retry_queue(job, to_email, subject, body, attachments)
-                
             except Exception as e:
                 error_msg = str(e)
                 print(f"Error in email process: {error_msg}")
@@ -351,6 +356,11 @@ def run(resume_path, smtp_email, smtp_password,
                 if should_retry_on_exception(e):
                     print("  [RETRY] Will retry this email due to temporary error")
                     add_to_retry_queue(job, to_email, subject, body, attachments)
+            
+            # Add a delay between jobs to reduce API rate limiting (free tier needs 10+ seconds)
+            job_delay = int(os.getenv('JOB_DELAY', '10'))
+            print(f"  [DELAY] Waiting {job_delay}s before next job to avoid rate limits...")
+            time.sleep(job_delay)
     
     # Process retry queue if enabled
     if process_retries and not dry_run:
@@ -382,6 +392,9 @@ if __name__ == '__main__':
     parser.add_argument('--keywords', default='', help='Keywords to search for (comma-separated)')
     parser.add_argument('--job-field', default='tech', help='Job field to search for (tech, marketing, design, business, healthcare, finance, education, legal, manufacturing, hospitality, nonprofit, pharma, agriculture, construction, retail, other)')
     parser.add_argument('--generate-motivational-letter', action='store_true', default=config['motivational_letter'], help='Generate motivational letter (default: true)' )
+    parser.add_argument('--ai-model', default='nousresearch/hermes-3-llama-3.1-405b:free', help='AI model to use for generation (default: nousresearch/hermes-3-llama-3.1-405b:free). See README for available models.')
+    parser.add_argument('--location', help='Location to search for jobs')
+    parser.add_argument('--job-name', help='Specific job name to search for')
     
     args = parser.parse_args()
     
@@ -398,9 +411,9 @@ if __name__ == '__main__':
         print("Error: SMTP password is required. Set SMTP_PASSWORD in .env or use --smtp-password argument.")
         sys.exit(1)
     
-    # Check if GEMINI_API_KEY is set
-    if not os.getenv('GEMINI_API_KEY'):
-        print("Error: GEMINI_API_KEY environment variable is not set.")
+    # Check if OPENROUTER_API_KEY is set
+    if not os.getenv('OPENROUTER_API_KEY'):
+        print("Error: OPENROUTER_API_KEY environment variable is not set.")
         sys.exit(1)
     
     run(
@@ -413,4 +426,7 @@ if __name__ == '__main__':
         job_type=args.job_type,
         job_category=args.job_category,
         job_field=args.job_field,
+        ai_model=args.ai_model,
+        location=args.location,
+        job_name=args.job_name
     )

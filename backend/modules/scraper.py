@@ -18,7 +18,7 @@ Normal job sources:
 
 import requests
 from bs4 import BeautifulSoup
-import time, random, re
+import time, random, re, os
 from urllib.parse import urljoin, quote
 
 # ---------------------------------------------------------------------------------------------------------------------
@@ -38,6 +38,41 @@ USER_AGENTS = [
     "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/120.0",
     "Mozilla/5.0 (Windows NT 10.0; rv:121.0) Gecko/20100101 Firefox/121.0",
 ]
+
+# ---------------------------------------------------------------------------------------------------------------------
+# COMPANY CLASSIFICATION
+# ---------------------------------------------------------------------------------------------------------------------
+
+FAANG_COMPANIES = [
+    'facebook', 'meta', 'amazon', 'apple', 'netflix', 'google', 'alphabet',
+    'microsoft', 'tesla', 'nvidia', 'adobe', 'salesforce', 'oracle', 'ibm', 'intel'
+]
+
+BIG_TECH_COMPANIES = [
+    'infosys', 'tcs', 'tata consultancy services', 'wipro', 'hcl', 'tech mahindra',
+    'accenture', 'capgemini', 'cognizant', 'deloitte', 'pwc', 'kpmg', 'ey',
+    'jpmorgan', 'goldman sachs', 'morgan stanley', 'cisco', 'dell', 'hp', 'lenovo',
+    'samsung', 'lg', 'sony', 'panasonic', 'siemens', 'ge', 'bosch', 'boeing', 'airbus'
+]
+
+def get_company_type(company_name):
+    """Classify company into FAANG, Big Tech, or Local"""
+    if not company_name or company_name in ["Unknown Company", "Freelancer Client", "Guru Client", "RemoteOK"]:
+        return "unknown"
+        
+    name_lower = company_name.lower()
+    
+    if any(c in name_lower for c in FAANG_COMPANIES):
+        return "faang"
+        
+    if any(c in name_lower for c in BIG_TECH_COMPANIES):
+        return "big_tech"
+        
+    # Startups/Agencies often have specific keywords
+    if any(k in name_lower for k in ['startup', 'technologies', 'solutions', 'labs', 'digital', 'studio', 'agency', 'consulting']):
+        return "startup_or_agency"
+        
+    return "local"
 
 def get_headers():
     return {"User-Agent": random.choice(USER_AGENTS)}
@@ -69,7 +104,7 @@ def is_tech_related(text: str, job_type: str = 'software'):
 # GOOGLE SEARCH → LINKEDIN JOBS
 # ---------------------------------------------------------------------------------------------------------------------
 
-def scrape_google_jobs(limit=10, job_type='software'):
+def scrape_google_jobs(limit=10, job_type='software', location=None, job_name=None):
     """
     Searches Google for:
         - "Software Developer Remote"
@@ -83,11 +118,28 @@ def scrape_google_jobs(limit=10, job_type='software'):
 
     print(f"\n[SEARCH] Searching Google Jobs / LinkedIn listings for freelance {job_type} jobs...")
 
-    queries = [
+    # Build search queries based on job type, location, and job name
+    base_queries = [
         f"Freelance {job_type} jobs remote",
         f"LinkedIn freelance {job_type}",
         f"Freelance {job_type} hiring",
     ]
+    
+    # Add location to queries if provided
+    if location:
+        base_queries.extend([
+            f"Freelance {job_type} jobs remote {location}",
+            f"LinkedIn freelance {job_type} {location}",
+        ])
+    
+    # Add job name to queries if provided
+    if job_name:
+        name_queries = []
+        for q in base_queries:
+            name_queries.append(f"{q} {job_name}")
+        base_queries.extend(name_queries)
+    
+    queries = base_queries
 
     jobs = []
 
@@ -142,20 +194,34 @@ def scrape_google_jobs(limit=10, job_type='software'):
 # FREELANCER.COM
 # ---------------------------------------------------------------------------------------------------------------------
 
-def scrape_freelancer(limit=10, job_type='software'):
+def scrape_freelancer(limit=10, job_type='software', location=None, job_name=None):
     jobs = []
     print(f"Scraping Freelancer.com for {job_type} jobs...")
 
     try:
         # Adjust URL based on job type
+        # Base URL based on job type
         if job_type == 'web':
-            url = "https://www.freelancer.com/jobs/web-development/"
+            base_url = "https://www.freelancer.com/jobs/web-development/"
         elif job_type == 'mobile':
-            url = "https://www.freelancer.com/jobs/mobile-app-development/"
+            base_url = "https://www.freelancer.com/jobs/mobile-app-development/"
         elif job_type == 'data':
-            url = "https://www.freelancer.com/jobs/data-entry-analytics/"
+            base_url = "https://www.freelancer.com/jobs/data-entry-analytics/"
         else:
-            url = "https://www.freelancer.com/jobs/software-development/"
+            base_url = "https://www.freelancer.com/jobs/software-development/"
+        
+        # Add search parameters if provided
+        search_params = []
+        if job_name:
+            search_params.append(f"search={quote(job_name)}")
+        if location:
+            search_params.append(f"location={quote(location)}")
+        
+        # Construct final URL
+        if search_params:
+            url = f"{base_url}?{'&'.join(search_params)}"
+        else:
+            url = base_url
             
         r = requests.get(url, headers=get_headers(), timeout=15)
         soup = BeautifulSoup(r.text, "html.parser")
@@ -195,7 +261,7 @@ def scrape_freelancer(limit=10, job_type='software'):
 # REMOTEOK API
 # ---------------------------------------------------------------------------------------------------------------------
 
-def scrape_remoteok(limit=10, job_type='software'):
+def scrape_remoteok(limit=10, job_type='software', location=None, job_name=None):
     jobs = []
     print(f"Scraping RemoteOK for {job_type} jobs...")
 
@@ -231,20 +297,34 @@ def scrape_remoteok(limit=10, job_type='software'):
 # GURU.COM
 # ---------------------------------------------------------------------------------------------------------------------
 
-def scrape_guru(limit=10, job_type='software'):
+def scrape_guru(limit=10, job_type='software', location=None, job_name=None):
     jobs = []
     print(f"Scraping Guru.com for {job_type} jobs...")
 
     try:
         # Adjust URL based on job type
+        # Base URL based on job type
         if job_type == 'web':
-            url = "https://www.guru.com/d/jobs/skill/web-development/"
+            base_url = "https://www.guru.com/d/jobs/skill/web-development/"
         elif job_type == 'mobile':
-            url = "https://www.guru.com/d/jobs/skill/mobile-app-development/"
+            base_url = "https://www.guru.com/d/jobs/skill/mobile-app-development/"
         elif job_type == 'data':
-            url = "https://www.guru.com/d/jobs/skill/data-analysis/"
+            base_url = "https://www.guru.com/d/jobs/skill/data-analysis/"
         else:
-            url = "https://www.guru.com/d/jobs/skill/software-development/"
+            base_url = "https://www.guru.com/d/jobs/skill/software-development/"
+        
+        # Add search parameters if provided
+        search_params = []
+        if job_name:
+            search_params.append(f"search={quote(job_name)}")
+        if location:
+            search_params.append(f"location={quote(location)}")
+        
+        # Construct final URL
+        if search_params:
+            url = f"{base_url}?{'&'.join(search_params)}"
+        else:
+            url = base_url
             
         r = requests.get(url, headers=get_headers(), timeout=10)
         soup = BeautifulSoup(r.text, "html.parser")
@@ -285,14 +365,26 @@ def scrape_guru(limit=10, job_type='software'):
 # LINKEDIN JOBS
 # ---------------------------------------------------------------------------------------------------------------------
 
-def scrape_linkedin_jobs(limit=10, job_type='software'):
-    """Scrape LinkedIn for normal (full-time) software jobs"""
+def scrape_linkedin_jobs(limit=10, job_name=None, location=None):
+    """Scrape LinkedIn for normal (full-time) jobs"""
     jobs = []
-    print(f"Scraping LinkedIn for {job_type} jobs...")
+    print(f"Scraping LinkedIn for jobs...")
     
     try:
-        # LinkedIn job search URL
-        url = f"https://www.linkedin.com/jobs/search/?keywords={job_type}&location=Remote&f_JT=F"
+        # LinkedIn job search URL with job name and location
+        params = []
+        if job_name:
+            params.append(f"keywords={job_name}")
+        else:
+            params.append("keywords=software developer")
+        
+        if location:
+            params.append(f"location={location}")
+        else:
+            params.append("location=Remote")
+        params.append("f_JT=F")
+        
+        url = f"https://www.linkedin.com/jobs/search/?{'&'.join(params)}"
         r = requests.get(url, headers=get_headers(), timeout=15)
         soup = BeautifulSoup(r.text, "html.parser")
         
@@ -319,21 +411,24 @@ def scrape_linkedin_jobs(limit=10, job_type='software'):
                 link_elem = card.find("a", class_="base-card__link")
                 link = link_elem.get("href", "") if link_elem else ""
                 
-                # Check if job is related to the specified type
-                if is_tech_related(title):
-                    jobs.append({
-                        "title": title,
-                        "company": company,
-                        "source": link,
-                        "description": f"{title} at {company} - {location}",
-                        "platform": "LinkedIn"
-                    })
+                # For normal jobs, we don't filter by tech keywords since job_name is more specific
+                description = f"{title} at {company} - {location}"
+                jobs.append({
+                    "title": title,
+                    "company": company,
+                    "source": link,
+                    "description": description,
+                    "platform": "LinkedIn",
+                    "relevance_score": _calculate_relevance_score(title, description, job_name, company, location, location)
+                })
             except Exception as e:
                 continue
                 
     except Exception as e:
         print(f"LinkedIn scraping error: {e}")
     
+    # Sort jobs by relevance score
+    jobs.sort(key=lambda x: x.get("relevance_score", 0), reverse=True)
     print(f"LinkedIn jobs: {len(jobs)}")
     return jobs[:limit]
 
@@ -342,14 +437,24 @@ def scrape_linkedin_jobs(limit=10, job_type='software'):
 # INDEED JOBS
 # ---------------------------------------------------------------------------------------------------------------------
 
-def scrape_indeed_jobs(limit=10, job_type='software'):
-    """Scrape Indeed for normal software jobs"""
+def scrape_indeed_jobs(limit=10, job_name=None, location=None):
+    """Scrape Indeed for normal jobs"""
     jobs = []
-    print(f"Scraping Indeed for {job_type} jobs...")
+    print(f"Scraping Indeed for jobs...")
     
     try:
-        # Indeed job search URL
-        url = f"https://www.indeed.com/jobs?q={job_type}&l=remote"
+        # Indeed job search URL with job name and location
+        params = []
+        if job_name:
+            params.append(f"q={job_name}")
+        else:
+            params.append("q=software developer")
+        if location:
+            params.append(f"l={location}")
+        else:
+            params.append("l=remote")
+        
+        url = f"https://www.indeed.com/jobs?{'&'.join(params)}"
         r = requests.get(url, headers=get_headers(), timeout=15)
         soup = BeautifulSoup(r.text, "html.parser")
         
@@ -373,21 +478,24 @@ def scrape_indeed_jobs(limit=10, job_type='software'):
                 location_elem = card.find("div", class_="companyLocation")
                 location = location_elem.get_text(strip=True) if location_elem else "Remote"
                 
-                # Check if job is related to the specified type
-                if is_tech_related(title):
-                    jobs.append({
-                        "title": title,
-                        "company": company,
-                        "source": url,  # Indeed blocks direct links, so using search URL
-                        "description": f"{title} at {company} - {location}",
-                        "platform": "Indeed"
-                    })
+                # For normal jobs, we don't filter by tech keywords since job_name is more specific
+                description = f"{title} at {company} - {location}"
+                jobs.append({
+                    "title": title,
+                    "company": company,
+                    "source": url,  # Indeed blocks direct links, so using search URL
+                    "description": description,
+                    "platform": "Indeed",
+                    "relevance_score": _calculate_relevance_score(title, description, job_name, company, location, location)
+                })
             except Exception as e:
                 continue
                 
     except Exception as e:
         print(f"Indeed scraping error: {e}")
     
+    # Sort jobs by relevance score
+    jobs.sort(key=lambda x: x.get("relevance_score", 0), reverse=True)
     print(f"Indeed jobs: {len(jobs)}")
     return jobs[:limit]
 
@@ -396,14 +504,27 @@ def scrape_indeed_jobs(limit=10, job_type='software'):
 # GLASSDOOR JOBS
 # ---------------------------------------------------------------------------------------------------------------------
 
-def scrape_glassdoor_jobs(limit=10, job_type='software'):
-    """Scrape Glassdoor for normal software jobs"""
+def scrape_glassdoor_jobs(limit=10, job_name=None, location=None):
+    """Scrape Glassdoor for normal jobs"""
     jobs = []
-    print(f"Scraping Glassdoor for {job_type} jobs...")
+    print(f"Scraping Glassdoor for jobs...")
     
     try:
-        # Glassdoor job search URL
-        url = f"https://www.glassdoor.com/Job/jobs.htm?sc.keyword={job_type}&locT=C&locId=1147401&locKeyword=Remote&jobType="
+        # Glassdoor job search URL with job name and location
+        params = []
+        if job_name:
+            params.append(f"sc.keyword={job_name}")
+        else:
+            params.append("sc.keyword=software developer")
+        
+        # Handle location parameter
+        if location:
+            params.append(f"locKeyword={location}")
+        else:
+            params.append("locT=C&locId=1147401&locKeyword=Remote")
+        params.append("jobType=")
+        
+        url = f"https://www.glassdoor.com/Job/jobs.htm?{'&'.join(params)}"
         r = requests.get(url, headers=get_headers(), timeout=15)
         soup = BeautifulSoup(r.text, "html.parser")
         
@@ -430,21 +551,24 @@ def scrape_glassdoor_jobs(limit=10, job_type='software'):
                 link_elem = listing.find("a", class_="jobLink")
                 link = "https://www.glassdoor.com" + link_elem.get("href", "") if link_elem else ""
                 
-                # Check if job is related to the specified type
-                if is_tech_related(title):
-                    jobs.append({
-                        "title": title,
-                        "company": company,
-                        "source": link,
-                        "description": f"{title} at {company} - {location}",
-                        "platform": "Glassdoor"
-                    })
+                # For normal jobs, we don't filter by tech keywords since job_name is more specific
+                description = f"{title} at {company} - {location}"
+                jobs.append({
+                    "title": title,
+                    "company": company,
+                    "source": link,
+                    "description": description,
+                    "platform": "Glassdoor",
+                    "relevance_score": _calculate_relevance_score(title, description, job_name, company, location, location)
+                })
             except Exception as e:
                 continue
                 
     except Exception as e:
         print(f"Glassdoor scraping error: {e}")
     
+    # Sort jobs by relevance score
+    jobs.sort(key=lambda x: x.get("relevance_score", 0), reverse=True)
     print(f"Glassdoor jobs: {len(jobs)}")
     return jobs[:limit]
 
@@ -453,18 +577,28 @@ def scrape_glassdoor_jobs(limit=10, job_type='software'):
 # GOOGLE NORMAL JOBS
 # ---------------------------------------------------------------------------------------------------------------------
 
-def scrape_google_normal_jobs(limit=10, job_type='software'):
+def scrape_google_normal_jobs(limit=10, job_name=None, location=None):
     """Scrape Google for normal full-time software jobs"""
     jobs = []
-    print(f"Scraping Google for normal {job_type} jobs...")
+    print(f"Scraping Google for normal jobs...")
     
     try:
         # Google job search queries for full-time positions
-        queries = [
-            f"{job_type} full time remote job",
-            f"{job_type} developer full time",
-            f"{job_type} position remote full time",
+        # Build search queries based on job name and location
+        base_queries = [
+            f"{job_name} full time remote job" if job_name else "software developer full time remote job",
+            f"{job_name} developer full time" if job_name else "software developer full time",
+            f"{job_name} position remote full time" if job_name else "software position remote full time",
         ]
+        
+        # Add location to queries if provided
+        if location:
+            location_queries = []
+            for q in base_queries:
+                location_queries.append(f"{q} {location}")
+            base_queries.extend(location_queries)
+        
+        queries = base_queries
         
         for q in queries:
             if len(jobs) >= limit:
@@ -497,33 +631,110 @@ def scrape_google_normal_jobs(limit=10, job_type='software'):
                 snippet = rblock.find("span")
                 desc = snippet.get_text(strip=True) if snippet else title
                 
-                # Check if job is related to the specified type
-                if is_tech_related(title + desc):
-                    jobs.append({
-                        "title": title,
-                        "company": "Unknown / Google",
-                        "source": link,
-                        "description": desc,
-                        "platform": "Google Search / Normal Jobs"
-                    })
-                    
+                # For normal jobs, we don't filter by tech keywords since job_name is more specific
+                # But we should still rank jobs based on relevance to the job_name
+                jobs.append({
+                    "title": title,
+                    "company": "Unknown / Google",
+                    "source": link,
+                    "description": desc,
+                    "platform": "Google Search / Normal Jobs",
+                    "relevance_score": _calculate_relevance_score(title, desc, job_name, "Unknown / Google", None, location)
+                })
+                
     except Exception as e:
         print(f"Google normal jobs scraping error: {e}")
     
+    # Sort jobs by relevance score
+    jobs.sort(key=lambda x: x.get("relevance_score", 0), reverse=True)
     print(f"Google normal jobs: {len(jobs)}")
     return jobs[:limit]
+
+
+def _calculate_relevance_score(title, description, job_name, company=None, job_location=None, user_location=None):
+    """
+    Calculate relevance score based on:
+    1. Location Match (40 points)
+    2. Company Type (30 points)
+    3. Job Match (30 points)
+    """
+    score = 0
+    
+    # 1. Location Score (Max 40)
+    if user_location and job_location:
+        u_loc = user_location.lower()
+        j_loc = job_location.lower()
+        
+        if u_loc in j_loc or j_loc in u_loc:
+            score += 40  # Exact/Close match
+        elif "remote" in j_loc:
+            score += 15  # Remote is okay but less preferred if prioritizing local
+        else:
+            score += 5   # Different location
+    elif user_location:
+        # If user specified location but job has no location, penalize slightly
+        score += 10
+    else:
+        # No location preference
+        score += 20
+        
+    # 2. Company Score (Max 30)
+    # Check if we should exclude FAANG
+    exclude_faang = os.environ.get('EXCLUDE_FAANG', 'false').lower() == 'true'
+    company_priority = os.environ.get('COMPANY_PRIORITY', 'local').lower()
+    
+    company_type = get_company_type(company)
+    
+    if company_type == "faang":
+        if exclude_faang:
+            return -100 # Filter out
+        score += 10 # Low priority for FAANG if we want local
+    elif company_type == "big_tech":
+        score += 15
+    elif company_type == "startup_or_agency":
+        score += 25
+    elif company_type == "local":
+        score += 30 # Highest priority for local
+    else:
+        score += 10 # Unknown
+        
+    # 3. Job Match Score (Max 30)
+    if not job_name:
+        score += 15
+    else:
+        job_name_lower = job_name.lower()
+        title_lower = title.lower()
+        desc_lower = description.lower()
+        
+        # Higher weight for exact matches in title
+        if job_name_lower in title_lower:
+            score += 30
+        
+        # Medium weight for partial matches in title
+        words = job_name_lower.split()
+        match_count = sum(1 for word in words if len(word) > 2 and word in title_lower)
+        if match_count > 0:
+            score += 10 + (match_count * 5)
+        
+        # Lower weight for matches in description
+        if job_name_lower in desc_lower:
+            score += 5
+            
+    return score
 
 
 # ---------------------------------------------------------------------------------------------------------------------
 # MAIN WRAPPER
 # ---------------------------------------------------------------------------------------------------------------------
 
-def scrape_jobs(limit=30, job_type='software', job_category='freelance'):
+def scrape_jobs(limit=30, job_type='software', job_category='freelance', location=None, job_name=None):
     """ Scrape jobs based on type and category """
-    print(f"\n[SCRAPING] Starting {job_category.title()} {job_type.title()} Job Scraping...")
-
+    location_str = f" in {location}" if location else ""
+    job_name_str = f" for {job_name}" if job_name else ""
+    print(f"\n[SCRAPING] Starting {job_category.title()} jobs{job_name_str}{location_str}...")
+    
     results = []
-
+    
     if job_category == 'freelance':
         scrapers = [
             scrape_freelancer,
@@ -538,24 +749,52 @@ def scrape_jobs(limit=30, job_type='software', job_category='freelance'):
             scrape_glassdoor_jobs,
             scrape_google_normal_jobs
         ]
-
+    
     per_site = max(5, limit // len(scrapers))
-
+    
     for s in scrapers:
-        # Pass job_type to each scraper function
-        jobs = s(per_site, job_type) if s.__code__.co_argcount > 1 else s(per_site)
-        results.extend(jobs)
-        time.sleep(random.uniform(1, 3))
-
+        try:
+            # Pass appropriate arguments based on job category and function signature
+            if job_category == 'freelance':
+                # Freelance jobs use job_type, location, and job_name
+                if 'location' in s.__code__.co_varnames and 'job_name' in s.__code__.co_varnames:
+                    jobs = s(per_site, job_type, location, job_name)
+                else:
+                    jobs = s(per_site, job_type)
+            else:
+                # Normal jobs only use job_name and location (job_type becomes job_name for normal jobs)
+                if 'job_name' in s.__code__.co_varnames and 'location' in s.__code__.co_varnames:
+                    # Special case for normal jobs: we pass job_name as the first parameter (instead of job_type)
+                    jobs = s(per_site, job_name, location)
+                elif 'job_name' in s.__code__.co_varnames:
+                    jobs = s(per_site, job_name)
+                elif 'location' in s.__code__.co_varnames:
+                    jobs = s(per_site, location)
+                else:
+                    jobs = s(per_site)
+            results.extend(jobs)
+            time.sleep(random.uniform(1, 3))
+        except Exception as e:
+            print(f"Error scraping with {s.__name__}: {e}")
+            continue
+    
     # Remove duplicates
     unique = []
     seen = set()
-
+    
     for j in results:
         key = j["title"].lower().replace(" ", "")
         if key not in seen:
             unique.append(j)
             seen.add(key)
-
+    
+    # Sort by relevance score for both normal and freelance jobs (if score exists)
+    unique.sort(key=lambda x: x.get("relevance_score", 0), reverse=True)
+    
+    # Log top 3 priority jobs
+    print("\n[PRIORITY] Top 3 jobs based on scoring:")
+    for i, j in enumerate(unique[:3], 1):
+        print(f"  {i}. {j['title']} at {j.get('company', 'Unknown')} (Score: {j.get('relevance_score', 0)})")
+    
     print(f"\n[TOTAL] TOTAL {job_category.upper()} JOBS COLLECTED: {len(unique)}")
     return unique[:limit]

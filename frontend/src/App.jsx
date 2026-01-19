@@ -1,6 +1,9 @@
 import { useState, useEffect } from 'react';
+import Navbar from './components/Navbar';
 import Dashboard from './components/Dashboard';
+import JobsPage from './components/JobsPage';
 import ActivityPage from './components/ActivityPage';
+import SettingsPage from './components/SettingsPage';
 import { ThemeProvider, useTheme } from './context/ThemeContext';
 import './App.css';
 
@@ -9,17 +12,39 @@ function AppContent() {
   const [currentPage, setCurrentPage] = useState('dashboard');
 
   useEffect(() => {
+    // Handle browser back/forward
     const handlePopState = () => {
       const path = window.location.pathname;
-      setCurrentPage(path === '/activity' ? 'activity' : 'dashboard');
+      if (path === '/jobs') setCurrentPage('jobs');
+      else if (path === '/activity') setCurrentPage('activity');
+      else if (path === '/settings') setCurrentPage('settings');
+      else setCurrentPage('dashboard');
     };
 
     window.addEventListener('popstate', handlePopState);
-    const path = window.location.pathname;
-    setCurrentPage(path === '/activity' ? 'activity' : 'dashboard');
+    handlePopState(); // Set initial state
 
     return () => window.removeEventListener('popstate', handlePopState);
   }, []);
+
+  const handleNavigate = (page) => {
+    setCurrentPage(page);
+    const path = page === 'dashboard' ? '/' : `/${page}`;
+    window.history.pushState({}, '', path);
+  };
+
+  const renderPage = () => {
+    switch (currentPage) {
+      case 'jobs':
+        return <JobsPage />;
+      case 'activity':
+        return <ActivityPage />;
+      case 'settings':
+        return <SettingsPage />;
+      default:
+        return <Dashboard onNavigate={handleNavigate} />;
+    }
+  };
 
   const appStyle = {
     backgroundColor: theme.colors.background,
@@ -28,20 +53,11 @@ function AppContent() {
     transition: 'background-color 0.3s ease, color 0.3s ease',
   };
 
-  const headerStyle = {
-    backgroundColor: theme.colors.headerBg,
-    color: theme.colors.headerText,
-    padding: '1rem 0',
-    boxShadow: theme.colors.cardShadow,
-  };
-
   return (
     <div className="App" style={appStyle}>
-      <header className="App-header" style={headerStyle}>
-        <h1>Jobs Mail Sender Dashboard</h1>
-      </header>
-      <main>
-        {currentPage === 'activity' ? <ActivityPage /> : <Dashboard />}
+      <Navbar currentPage={currentPage} onNavigate={handleNavigate} />
+      <main className="main-content">
+        {renderPage()}
       </main>
     </div>
   );

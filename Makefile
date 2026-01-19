@@ -74,7 +74,8 @@ build-docker:
 .PHONY: run-docker
 run-docker: build-docker
 	@echo "🐳 Running with Docker Compose..."
-	docker-compose up --build
+	docker build -t jobs-mail-sender .
+	docker-compose up -d
 
 .PHONY: run-docker-dev
 run-docker-dev: build-docker

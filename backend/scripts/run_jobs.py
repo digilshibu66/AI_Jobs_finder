@@ -16,9 +16,10 @@ def run_job_search(job_category, job_type='software', job_limit=30):
     print(f"Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     print(f"{'='*60}")
     
-    # Build command - run from src directory
+    # Build command - run from backend directory
+    backend_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     cmd = [
-        sys.executable, os.path.join('src', 'main.py'),
+        sys.executable, os.path.join(backend_dir, 'main.py'),
         '--job-category', job_category,
         '--job-type', job_type,
         '--job-limit', str(job_limit)

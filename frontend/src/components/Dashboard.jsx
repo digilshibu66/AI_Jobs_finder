@@ -1,13 +1,10 @@
 import { useState, useEffect } from 'react';
 import JobStats from './JobStats';
-import JobRunner from './JobRunner';
-import ThemeSwitcher from './ThemeSwitcher';
 import { useTheme } from '../context/ThemeContext';
 import '../styles/Dashboard.css';
 
-const Dashboard = () => {
+const Dashboard = ({ onNavigate }) => {
   const { theme } = useTheme();
-  const [logs, setLogs] = useState([]);
   const [stats, setStats] = useState({
     totalJobs: 0,
     success: 0,
@@ -15,117 +12,118 @@ const Dashboard = () => {
     skipped: 0,
     dryRun: 0
   });
+  const [recentLogs, setRecentLogs] = useState([]);
 
-  // Fetch data from the backend
   useEffect(() => {
     const fetchData = async () => {
       try {
-        // Fetch logs
-        const logsResponse = await fetch('/api/logs');
-        const logsData = await logsResponse.json();
-        
-        // Fetch stats
-        const statsResponse = await fetch('/api/stats');
-        const statsData = await statsResponse.json();
-        
-        if (logsData.success) {
-          // Add id field if not present
-          const logs = logsData.data.map((log, index) => ({
-            ...log,
-            id: log.id || index + 1
-          }));
-          setLogs(logs);
-        }
-        
-        if (statsData.success) {
-          setStats(statsData.data);
-        }
+        const [statsRes, logsRes] = await Promise.all([
+          fetch('/api/stats'),
+          fetch('/api/logs')
+        ]);
+
+        const statsData = await statsRes.json();
+        const logsData = await logsRes.json();
+
+        if (statsData.success) setStats(statsData.data);
+        if (logsData.success) setRecentLogs(logsData.data.slice(-5));
       } catch (error) {
         console.error('Error fetching data:', error);
       }
     };
-    
+
     fetchData();
-    
-    // Set up interval to refresh data every 30 seconds
     const interval = setInterval(fetchData, 30000);
     return () => clearInterval(interval);
   }, []);
 
-  // Function to refresh data manually
-  const refreshData = async () => {
-    try {
-      // Fetch logs
-      const logsResponse = await fetch('/api/logs');
-      const logsData = await logsResponse.json();
-      
-      // Fetch stats
-      const statsResponse = await fetch('/api/stats');
-      const statsData = await statsResponse.json();
-      
-      if (logsData.success) {
-        // Add id field if not present
-        const logs = logsData.data.map((log, index) => ({
-          ...log,
-          id: log.id || index + 1
-        }));
-        setLogs(logs);
-      }
-      
-      if (statsData.success) {
-        setStats(statsData.data);
-      }
-    } catch (error) {
-      console.error('Error refreshing data:', error);
-    }
+  const cardStyle = {
+    backgroundColor: theme.colors.surface,
+    borderRadius: '16px',
+    padding: '24px',
+    boxShadow: theme.colors.cardShadow
   };
 
-  const handleViewAllActivity = () => {
-    window.history.pushState({}, '', '/activity');
-    window.dispatchEvent(new PopStateEvent('popstate'));
-  };
+  const quickActions = [
+    { id: 'jobs', icon: '🔍', title: 'Start Job Search', desc: 'Find and apply to jobs' },
+    { id: 'activity', icon: '📋', title: 'View Activity', desc: 'See all email logs' },
+    { id: 'settings', icon: '⚙️', title: 'Settings', desc: 'Configure AI models' }
+  ];
 
   return (
-    <div className="dashboard" style={{ backgroundColor: theme.colors.background }}>
-      <div className="dashboard-header" style={{ borderBottom: `1px solid ${theme.colors.border}` }}>
-        <h2 style={{ color: theme.colors.text }}>Job Application Dashboard</h2>
-        <div className="header-controls" style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-          <button onClick={refreshData} className="refresh-button" style={{ backgroundColor: theme.colors.secondary, color: theme.colors.headerText }}>
-            Refresh Data
-          </button>
-          <ThemeSwitcher />
+    <div className="dashboard-page" style={{ backgroundColor: theme.colors.background }}>
+      <div className="dashboard-container">
+        {/* Welcome Section */}
+        <div className="welcome-section">
+          <h2 style={{ color: theme.colors.text }}>👋 Welcome Back!</h2>
+          <p style={{ color: theme.colors.textSecondary }}>
+            Your automated job application system is ready
+          </p>
         </div>
-      </div>
-      
-      <div className="dashboard-content">
-        <div className="dashboard-section">
+
+        {/* Stats Row */}
+        <div className="stats-section">
           <JobStats stats={stats} />
         </div>
-        
-        <div className="dashboard-section">
-          <JobRunner onRunComplete={refreshData} />
-        </div>
-        
-        <div className="dashboard-section">
-          <div style={{ backgroundColor: theme.colors.surface, padding: '20px', borderRadius: '8px', boxShadow: theme.colors.cardShadow, textAlign: 'center' }}>
-            <h3 style={{ color: theme.colors.text, marginBottom: '20px' }}>Activity Logs</h3>
-            <button 
-              onClick={handleViewAllActivity}
-              style={{
-                backgroundColor: theme.colors.secondary,
-                color: theme.colors.headerText,
-                padding: '12px 24px',
-                border: 'none',
-                borderRadius: '4px',
-                cursor: 'pointer',
-                fontWeight: 'bold',
-                fontSize: '1rem'
-              }}
-            >
-              View Complete Activity Logs →
-            </button>
-            <p style={{ color: theme.colors.textSecondary, marginTop: '10px' }}>Click to view the full email activity table with search and filter options</p>
+
+        {/* Quick Actions */}
+        <div className="quick-actions">
+          <h3 style={{ color: theme.colors.text }}>Quick Actions</h3>
+          <div className="actions-grid">
+            {quickActions.map(action => (
+              <div
+                key={action.id}
+                className="action-card"
+                onClick={() => onNavigate(action.id)}
+                style={cardStyle}
+              >
+                <span className="action-icon">{action.icon}</span>
+                <h4 style={{ color: theme.colors.text }}>{action.title}</h4>
+                <p style={{ color: theme.colors.textSecondary }}>{action.desc}</p>
+              </div>
+            ))}
           </div>
+        </div>
+
+        {/* Recent Activity */}
+        <div className="recent-section" style={cardStyle}>
+          <h3 style={{ color: theme.colors.text }}>📊 Recent Activity</h3>
+          {recentLogs.length > 0 ? (
+            <div className="recent-list">
+              {recentLogs.map((log, index) => (
+                <div
+                  key={index}
+                  className="recent-item"
+                  style={{ borderBottom: `1px solid ${theme.colors.border}` }}
+                >
+                  <div className="recent-info">
+                    <span className="recent-title" style={{ color: theme.colors.text }}>
+                      {log.job_title || log['Job Title'] || 'Unknown Job'}
+                    </span>
+                    <span className="recent-company" style={{ color: theme.colors.textSecondary }}>
+                      {log.company || log['Company'] || 'Unknown Company'}
+                    </span>
+                  </div>
+                  <span
+                    className={`recent-status status-${(log.status || log['Status'] || '').toLowerCase()}`}
+                  >
+                    {log.status || log['Status'] || 'Unknown'}
+                  </span>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p style={{ color: theme.colors.textSecondary, textAlign: 'center', padding: '2rem' }}>
+              No recent activity. Start a job search to see results here.
+            </p>
+          )}
+          <button
+            className="view-all-btn"
+            onClick={() => onNavigate('activity')}
+            style={{ color: theme.colors.primary }}
+          >
+            View All Activity →
+          </button>
         </div>
       </div>
     </div>

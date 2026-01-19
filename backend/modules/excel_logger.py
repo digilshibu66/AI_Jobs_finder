@@ -9,8 +9,9 @@ class EmailLogger:
     def __init__(self, log_file_path=None):
         # Use a consistent path for the Excel file
         if log_file_path is None:
-            # Use /app/email_log.xlsx as the default path
-            self.log_file_path = '/app/email_log.xlsx'
+            # Use a relative path from the project root
+            project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+            self.log_file_path = os.path.join(project_root, 'email_log.xlsx')
         else:
             self.log_file_path = log_file_path
             

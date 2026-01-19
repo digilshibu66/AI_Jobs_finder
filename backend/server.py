@@ -1,4 +1,4 @@
-from flask import Flask, jsonify, request, send_from_directory
+from flask import Flask, jsonify, request, send_from_directory, Response
 import pandas as pd
 import os
 from datetime import datetime
@@ -6,15 +6,16 @@ import subprocess
 import sys
 from dotenv import set_key, load_dotenv
 import numpy as np
+import threading
+import queue
+import json
 
 app = Flask(__name__, static_folder='../frontend/dist')
 
-# Path to the Excel log file - FIXED PATH ISSUE
-# Use /app/email_log.xlsx as the default path
-EXCEL_FILE_PATH = '/app/email_log.xlsx'
-
-# Get the backend directory path
+# Path to the Excel log file (in backend directory)
+project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 BACKEND_DIR = os.path.dirname(os.path.abspath(__file__))
+EXCEL_FILE_PATH = os.path.join(BACKEND_DIR, 'email_log.xlsx')
 
 # Serve static files from the React build
 @app.route('/', defaults={'path': ''})
@@ -64,12 +65,56 @@ def get_statistics(logs):
 
 @app.route('/api/logs', methods=['GET'])
 def get_logs():
-    """Get all logs"""
+    """Get logs with optional filtering via query parameters"""
     try:
         logs = read_excel_data()
+        
+        # Get filter parameters from query string
+        status = request.args.get('status', '').strip()
+        platform = request.args.get('platform', '').strip()
+        date = request.args.get('date', '').strip()
+        search = request.args.get('search', '').strip().lower()
+        
+        # Apply filters if provided
+        filtered_logs = []
+        for log in logs:
+            # Normalize field names
+            log_status = str(log.get('status', log.get('Status', ''))).upper()
+            log_platform = str(log.get('platform', log.get('Platform', '')))
+            log_timestamp = str(log.get('timestamp', log.get('Timestamp', '')))
+            log_title = str(log.get('job_title', log.get('Job Title', ''))).lower()
+            log_company = str(log.get('company', log.get('Company', ''))).lower()
+            log_email = str(log.get('to_email', log.get('To Email', ''))).lower()
+            
+            # Status filter
+            if status and log_status != status.upper():
+                continue
+            
+            # Platform filter
+            if platform and log_platform != platform:
+                continue
+            
+            # Date filter (compare date part only)
+            if date:
+                try:
+                    from datetime import datetime
+                    log_date = datetime.fromisoformat(log_timestamp.replace('Z', '+00:00'))
+                    if log_date.strftime('%Y-%m-%d') != date:
+                        continue
+                except:
+                    continue
+            
+            # Search filter
+            if search and not (search in log_title or search in log_company or search in log_email):
+                continue
+            
+            filtered_logs.append(log)
+        
         return jsonify({
             'success': True,
-            'data': logs
+            'data': filtered_logs,
+            'total': len(logs),
+            'filtered': len(filtered_logs)
         })
     except Exception as e:
         return jsonify({
@@ -93,9 +138,52 @@ def get_stats():
             'error': str(e)
         }), 500
 
+@app.route('/api/logs/filters', methods=['GET'])
+def get_log_filters():
+    """Get unique filter options from logs"""
+    try:
+        logs = read_excel_data()
+        
+        statuses = set()
+        platforms = set()
+        dates = set()
+        
+        for log in logs:
+            # Get status
+            status = str(log.get('status', log.get('Status', ''))).strip()
+            if status:
+                statuses.add(status.upper())
+            
+            # Get platform
+            platform = str(log.get('platform', log.get('Platform', ''))).strip()
+            if platform:
+                platforms.add(platform)
+            
+            # Get date
+            timestamp = str(log.get('timestamp', log.get('Timestamp', ''))).strip()
+            if timestamp:
+                try:
+                    from datetime import datetime
+                    dt = datetime.fromisoformat(timestamp.replace('Z', '+00:00'))
+                    dates.add(dt.strftime('%Y-%m-%d'))
+                except:
+                    pass
+        
+        return jsonify({
+            'success': True,
+            'statuses': sorted(list(statuses)),
+            'platforms': sorted(list(platforms)),
+            'dates': sorted(list(dates), reverse=True)
+        })
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
 @app.route('/api/run-jobs', methods=['POST'])
 def run_jobs():
-    """Run the job processing script"""
+    """Run the job processing script with live streaming output"""
     try:
         # Get parameters from request
         data = request.json or {}
@@ -103,24 +191,19 @@ def run_jobs():
         job_type = data.get('jobType', 'software')
         job_limit = data.get('jobLimit', 30)
         send_emails = data.get('sendEmails', False)
-        keywords = data.get('keywords')
-        job_field = data.get('jobField')
         generate_motivational_letter = data.get('generateMotivationalLetter', True)
+        ai_model = data.get('aiModel', 'google/gemini-2.0-flash-exp:free')
+        location = data.get('location')
+        job_name = data.get('jobName')
         
-        # Build command with correct path
+        # Build command
         cmd = [
-            sys.executable, 
+            sys.executable, '-u',  # -u for unbuffered output
             os.path.join(BACKEND_DIR, 'main.py'),
             '--job-category', job_category,
             '--job-type', job_type,
             '--job-limit', str(job_limit)
         ]
-        
-        # Add optional parameters
-        if keywords:
-            cmd.extend(['--keywords', keywords])
-        if job_field:
-            cmd.extend(['--job-field', job_field])
         
         if send_emails:
             cmd.append('--send')
@@ -128,25 +211,103 @@ def run_jobs():
         if generate_motivational_letter:
             cmd.append('--generate-motivational-letter')
             
-        # Run the command
-        result = subprocess.run(
+        cmd.extend(['--ai-model', ai_model])
+        
+        if location:
+            cmd.extend(['--location', location])
+        if job_name:
+            cmd.extend(['--job-name', job_name])
+        
+        # Run synchronously and capture output
+        process = subprocess.Popen(
             cmd,
-            capture_output=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
             text=True,
-            cwd=BACKEND_DIR  # Set working directory to backend
+            cwd=BACKEND_DIR,
+            bufsize=1
         )
+        
+        # Collect all output
+        output_lines = []
+        for line in process.stdout:
+            output_lines.append(line)
+        
+        process.wait()
         
         return jsonify({
             'success': True,
-            'stdout': result.stdout,
-            'stderr': result.stderr,
-            'returncode': result.returncode
+            'output': ''.join(output_lines),
+            'returncode': process.returncode
         })
     except Exception as e:
         return jsonify({
             'success': False,
             'error': str(e)
         }), 500
+
+@app.route('/api/run-jobs-stream', methods=['POST'])
+def run_jobs_stream():
+    """Run jobs with Server-Sent Events for live streaming"""
+    data = request.json or {}
+    
+    def generate():
+        job_category = data.get('jobCategory', 'freelance')
+        job_type = data.get('jobType', 'software')
+        job_limit = data.get('jobLimit', 30)
+        send_emails = data.get('sendEmails', False)
+        generate_motivational_letter = data.get('generateMotivationalLetter', True)
+        ai_model = data.get('aiModel', 'google/gemini-2.0-flash-exp:free')
+        location = data.get('location')
+        job_name = data.get('jobName')
+        
+        # Build command
+        cmd = [
+            sys.executable, '-u',
+            os.path.join(BACKEND_DIR, 'main.py'),
+            '--job-category', job_category,
+            '--job-type', job_type,
+            '--job-limit', str(job_limit)
+        ]
+        
+        if send_emails:
+            cmd.append('--send')
+        if generate_motivational_letter:
+            cmd.append('--generate-motivational-letter')
+        cmd.extend(['--ai-model', ai_model])
+        if location:
+            cmd.extend(['--location', location])
+        if job_name:
+            cmd.extend(['--job-name', job_name])
+        
+        yield 'data: ' + json.dumps({'type': 'start', 'message': 'Starting job search...'}) + '\n\n'
+        cmd_str = ' '.join(cmd)
+        yield 'data: ' + json.dumps({'type': 'info', 'message': 'Command: ' + cmd_str}) + '\n\n'
+        
+        try:
+            process = subprocess.Popen(
+                cmd,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True,
+                cwd=BACKEND_DIR,
+                bufsize=1
+            )
+            
+            for line in process.stdout:
+                yield 'data: ' + json.dumps({'type': 'log', 'message': line.strip()}) + '\n\n'
+            
+            process.wait()
+            
+            if process.returncode == 0:
+                yield 'data: ' + json.dumps({'type': 'complete', 'message': 'Job processing completed successfully!'}) + '\n\n'
+            else:
+                yield 'data: ' + json.dumps({'type': 'error', 'message': 'Process exited with code ' + str(process.returncode)}) + '\n\n'
+                
+        except Exception as e:
+            yield 'data: ' + json.dumps({'type': 'error', 'message': str(e)}) + '\n\n'
+    
+    return Response(generate(), mimetype='text/event-stream')
 
 @app.route('/api/health', methods=['GET'])
 def health_check():
@@ -167,6 +328,9 @@ def run_jobs_modified():
         job_category = data.get('jobCategory', 'freelance')
         job_limit = data.get('jobLimit', 30)
         generate_motivational_letter = data.get('generateMotivationalLetter', True)
+        ai_model = data.get('aiModel', 'nousresearch/hermes-3-llama-3.1-405b:free')
+        location = data.get('location')
+        job_name = data.get('jobName')
         
         # Path to .env file in the project root directory
         project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -177,6 +341,11 @@ def run_jobs_modified():
         set_key(env_path, 'JOB_CATEGORY', job_category)
         set_key(env_path, 'JOB_LIMIT', str(job_limit))
         set_key(env_path, 'GENERATE_MOTIVATIONAL_LETTER', str(generate_motivational_letter).lower())
+        set_key(env_path, 'AI_MODEL', ai_model)
+        if location:
+            set_key(env_path, 'LOCATION', location)
+        if job_name:
+            set_key(env_path, 'JOB_NAME', job_name)
         
         # Reload environment variables
         load_dotenv(env_path, override=True)
@@ -184,8 +353,22 @@ def run_jobs_modified():
         # Build command to run main.py WITH correct path
         cmd = [
             sys.executable, 
-            os.path.join(BACKEND_DIR, 'main.py')
+            os.path.join(BACKEND_DIR, 'main.py'),
+            '--job-category', job_category,
+            '--job-type', job_type,
+            '--job-limit', str(job_limit),
+            '--ai-model', ai_model
         ]
+        
+        # Add location and job name parameters
+        if location:
+            cmd.extend(['--location', location])
+        if job_name:
+            cmd.extend(['--job-name', job_name])
+            
+        # Add other flags
+        if generate_motivational_letter:
+            cmd.append('--generate-motivational-letter')
         
         # Run the command
         result = subprocess.run(

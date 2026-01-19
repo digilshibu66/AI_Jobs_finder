@@ -1,248 +1,340 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useTheme } from '../context/ThemeContext';
 import '../styles/ActivityPage.css';
 
 const ActivityPage = () => {
   const { theme } = useTheme();
   const [logs, setLogs] = useState([]);
+  const [totalLogs, setTotalLogs] = useState(0);
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Filter states
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('');
-  const [currentPage, setCurrentPage] = useState(1);
-  const logsPerPage = 50;
+  const [filterPlatform, setFilterPlatform] = useState('');
+  const [filterDate, setFilterDate] = useState('');
 
-  // Fetch logs from backend
-  useEffect(() => {
-    const fetchLogs = async () => {
-      try {
-        const response = await fetch('/api/logs');
-        const data = await response.json();
-        if (data.success) {
-          const logsWithId = data.data.map((log, index) => ({
-            ...log,
-            id: log.id || index + 1
-          }));
-          setLogs(logsWithId);
-        }
-      } catch (error) {
-        console.error('Error fetching logs:', error);
-      }
-    };
-
-    fetchLogs();
-    // Refresh every 30 seconds
-    const interval = setInterval(fetchLogs, 30000);
-    return () => clearInterval(interval);
-  }, []);
-
-  const getStatusColor = (status) => {
-    switch (status) {
-      case 'SUCCESS':
-        return theme.colors.success;
-      case 'FAILED':
-        return theme.colors.danger;
-      case 'SKIPPED':
-        return theme.colors.warning;
-      case 'DRY_RUN':
-        return theme.colors.info;
-      default:
-        return theme.colors.primary;
-    }
-  };
-
-  // Filter logs based on search term and status
-  const filteredLogs = logs.filter(log => {
-    const matchesSearch = 
-      log.job_title?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      log.company?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      log.to_email?.toLowerCase().includes(searchTerm.toLowerCase());
-    
-    const matchesStatus = !filterStatus || log.status === filterStatus;
-    
-    return matchesSearch && matchesStatus;
+  // Filter options from API
+  const [filterOptions, setFilterOptions] = useState({
+    statuses: [],
+    platforms: [],
+    dates: []
   });
 
   // Pagination
-  const totalPages = Math.ceil(filteredLogs.length / logsPerPage);
-  const startIndex = (currentPage - 1) * logsPerPage;
-  const paginatedLogs = filteredLogs.slice(startIndex, startIndex + logsPerPage);
+  const [currentPage, setCurrentPage] = useState(1);
+  const logsPerPage = 25;
 
-  const handleGoBack = () => {
-    window.history.pushState({}, '', '/');
-    window.dispatchEvent(new PopStateEvent('popstate'));
+  // Fetch filter options when page loads
+  useEffect(() => {
+    const fetchFilterOptions = async () => {
+      try {
+        const response = await fetch('/api/logs/filters');
+        const data = await response.json();
+        if (data.success) {
+          setFilterOptions({
+            statuses: data.statuses || [],
+            platforms: data.platforms || [],
+            dates: data.dates || []
+          });
+        }
+      } catch (error) {
+        console.error('Error fetching filter options:', error);
+      }
+    };
+
+    fetchFilterOptions();
+  }, []);
+
+  // Fetch logs with filters (called on filter change)
+  const fetchLogs = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      // Build query string with filters
+      const params = new URLSearchParams();
+      if (filterStatus) params.append('status', filterStatus);
+      if (filterPlatform) params.append('platform', filterPlatform);
+      if (filterDate) params.append('date', filterDate);
+      if (searchTerm) params.append('search', searchTerm);
+
+      const url = `/api/logs${params.toString() ? '?' + params.toString() : ''}`;
+      const response = await fetch(url);
+      const data = await response.json();
+
+      if (data.success) {
+        // Normalize field names
+        const normalizedLogs = data.data.map((log, index) => ({
+          ...log,
+          id: log.id || index + 1,
+          job_title: log.job_title || log['Job Title'] || log['job title'] || '',
+          company: log.company || log['Company'] || '',
+          status: log.status || log['Status'] || '',
+          timestamp: log.timestamp || log['Timestamp'] || log['Date'] || '',
+          platform: log.platform || log['Platform'] || '',
+          to_email: log.to_email || log['To Email'] || log['Email'] || '',
+          source_url: log.source_url || log['Source URL'] || log['URL'] || ''
+        }));
+        setLogs(normalizedLogs);
+        setTotalLogs(data.total || normalizedLogs.length);
+      }
+    } catch (error) {
+      console.error('Error fetching logs:', error);
+    }
+    setIsLoading(false);
+  }, [filterStatus, filterPlatform, filterDate, searchTerm]);
+
+  // Fetch logs when page loads or filters change
+  useEffect(() => {
+    fetchLogs();
+  }, [fetchLogs]);
+
+  // Debounce search
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setCurrentPage(1);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
+
+  const getStatusColor = (status) => {
+    const statusUpper = (status || '').toUpperCase();
+    switch (statusUpper) {
+      case 'SUCCESS':
+        return { bg: 'rgba(72, 187, 120, 0.2)', text: '#38a169' };
+      case 'FAILED':
+        return { bg: 'rgba(245, 101, 101, 0.2)', text: '#e53e3e' };
+      case 'SKIPPED':
+        return { bg: 'rgba(236, 201, 75, 0.2)', text: '#d69e2e' };
+      case 'DRY_RUN':
+      case 'SCRAPED':
+      case 'PROCESSING':
+        return { bg: 'rgba(66, 153, 225, 0.2)', text: '#3182ce' };
+      default:
+        return { bg: 'rgba(160, 174, 192, 0.2)', text: '#718096' };
+    }
+  };
+
+  // Pagination (client-side on already filtered data)
+  const totalPages = Math.ceil(logs.length / logsPerPage);
+  const startIndex = (currentPage - 1) * logsPerPage;
+  const paginatedLogs = logs.slice(startIndex, startIndex + logsPerPage);
+
+  const clearFilters = () => {
+    setSearchTerm('');
+    setFilterStatus('');
+    setFilterPlatform('');
+    setFilterDate('');
+    setCurrentPage(1);
+  };
+
+  const handleFilterChange = (setter) => (e) => {
+    setter(e.target.value);
+    setCurrentPage(1);
+  };
+
+  const cardStyle = {
+    backgroundColor: theme.colors.surface,
+    borderRadius: '16px',
+    padding: '24px',
+    boxShadow: theme.colors.cardShadow
   };
 
   return (
-    <div className="activity-page" style={{ backgroundColor: theme.colors.background, minHeight: '100vh', padding: '20px' }}>
-      <div className="activity-header" style={{ marginBottom: '20px' }}>
-        <button 
-          onClick={handleGoBack}
-          style={{
-            backgroundColor: theme.colors.secondary,
-            color: theme.colors.headerText,
-            padding: '8px 16px',
-            border: 'none',
-            borderRadius: '4px',
-            cursor: 'pointer',
-            marginBottom: '15px'
-          }}
-        >
-          ← Back to Dashboard
-        </button>
-        <h1 style={{ color: theme.colors.text, marginBottom: '20px' }}>Email Activity Logs</h1>
-        
-        <div className="activity-controls" style={{ display: 'flex', gap: '15px', marginBottom: '20px', flexWrap: 'wrap' }}>
-          <input
-            type="text"
-            placeholder="Search by job title, company, or email..."
-            value={searchTerm}
-            onChange={(e) => {
-              setSearchTerm(e.target.value);
-              setCurrentPage(1);
-            }}
-            style={{
-              padding: '10px',
-              borderRadius: '4px',
-              border: `1px solid ${theme.colors.border}`,
-              backgroundColor: theme.colors.inputBg,
-              color: theme.colors.text,
-              flex: 1,
-              minWidth: '250px'
-            }}
-          />
-          
-          <select
-            value={filterStatus}
-            onChange={(e) => {
-              setFilterStatus(e.target.value);
-              setCurrentPage(1);
-            }}
-            style={{
-              padding: '10px',
-              borderRadius: '4px',
-              border: `1px solid ${theme.colors.border}`,
-              backgroundColor: theme.colors.inputBg,
-              color: theme.colors.text,
-              minWidth: '150px'
-            }}
-          >
-            <option value="">All Status</option>
-            <option value="SUCCESS">Success</option>
-            <option value="FAILED">Failed</option>
-            <option value="SKIPPED">Skipped</option>
-            <option value="DRY_RUN">Dry Run</option>
-          </select>
+    <div className="activity-page" style={{ backgroundColor: theme.colors.background }}>
+      <div className="activity-container">
+        {/* Header */}
+        <div className="activity-header">
+          <h2 style={{ color: theme.colors.text }}>📋 Activity Logs</h2>
+          <p style={{ color: theme.colors.textSecondary }}>
+            View and filter all job application activity from Excel log
+          </p>
+        </div>
 
-          <div style={{ color: theme.colors.textSecondary }}>
-            Total: {filteredLogs.length} | Page {currentPage} of {totalPages || 1}
+        {/* Filters */}
+        <div className="filters-card" style={cardStyle}>
+          <div className="filters-row">
+            <div className="filter-group">
+              <label style={{ color: theme.colors.text }}>🔍 Search</label>
+              <input
+                type="text"
+                placeholder="Search job, company, email..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                style={{ backgroundColor: theme.colors.inputBg, color: theme.colors.text }}
+              />
+            </div>
+
+            <div className="filter-group">
+              <label style={{ color: theme.colors.text }}>📊 Status</label>
+              <select
+                value={filterStatus}
+                onChange={handleFilterChange(setFilterStatus)}
+                style={{ backgroundColor: theme.colors.inputBg, color: theme.colors.text }}
+              >
+                <option value="">All Statuses</option>
+                {filterOptions.statuses.map(status => (
+                  <option key={status} value={status}>{status}</option>
+                ))}
+              </select>
+            </div>
+
+            <div className="filter-group">
+              <label style={{ color: theme.colors.text }}>🌐 Platform</label>
+              <select
+                value={filterPlatform}
+                onChange={handleFilterChange(setFilterPlatform)}
+                style={{ backgroundColor: theme.colors.inputBg, color: theme.colors.text }}
+              >
+                <option value="">All Platforms</option>
+                {filterOptions.platforms.map(platform => (
+                  <option key={platform} value={platform}>{platform}</option>
+                ))}
+              </select>
+            </div>
+
+            <div className="filter-group">
+              <label style={{ color: theme.colors.text }}>📅 Date</label>
+              <select
+                value={filterDate}
+                onChange={handleFilterChange(setFilterDate)}
+                style={{ backgroundColor: theme.colors.inputBg, color: theme.colors.text }}
+              >
+                <option value="">All Dates</option>
+                {filterOptions.dates.map(date => (
+                  <option key={date} value={date}>{date}</option>
+                ))}
+              </select>
+            </div>
+
+            <button
+              className="clear-btn"
+              onClick={clearFilters}
+              style={{ color: theme.colors.primary }}
+            >
+              Clear Filters
+            </button>
+          </div>
+
+          <div className="filters-summary" style={{ color: theme.colors.textSecondary }}>
+            {isLoading ? 'Loading...' : (
+              <>Showing {paginatedLogs.length} of {logs.length} filtered records ({totalLogs} total)</>
+            )}
           </div>
         </div>
-      </div>
 
-      <div className="activity-table-container" style={{ overflowX: 'auto', backgroundColor: theme.colors.surface, borderRadius: '8px', boxShadow: theme.colors.cardShadow }}>
-        <table className="activity-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
-          <thead>
-            <tr style={{ backgroundColor: theme.colors.headerBg, borderBottom: `2px solid ${theme.colors.border}` }}>
-              <th style={{ color: theme.colors.headerText, padding: '15px', textAlign: 'left', whiteSpace: 'nowrap' }}>Timestamp</th>
-              <th style={{ color: theme.colors.headerText, padding: '15px', textAlign: 'left', whiteSpace: 'nowrap' }}>Job Title</th>
-              <th style={{ color: theme.colors.headerText, padding: '15px', textAlign: 'left', whiteSpace: 'nowrap' }}>Company</th>
-              <th style={{ color: theme.colors.headerText, padding: '15px', textAlign: 'left', whiteSpace: 'nowrap' }}>Recipient Email</th>
-              <th style={{ color: theme.colors.headerText, padding: '15px', textAlign: 'left', whiteSpace: 'nowrap' }}>Status</th>
-              <th style={{ color: theme.colors.headerText, padding: '15px', textAlign: 'left' }}>Error Message</th>
-            </tr>
-          </thead>
-          <tbody>
-            {paginatedLogs.map((log) => (
-              <tr key={log.id} style={{ borderBottom: `1px solid ${theme.colors.border}`, '&:hover': { backgroundColor: theme.colors.background } }}>
-                <td style={{ padding: '15px', color: theme.colors.text, whiteSpace: 'nowrap', fontSize: '0.9rem' }}>{log.timestamp}</td>
-                <td style={{ padding: '15px', color: theme.colors.secondary, fontWeight: '500' }}>
-                  {log.source_url ? (
-                    <a href={log.source_url} target="_blank" rel="noopener noreferrer" style={{ color: theme.colors.secondary, textDecoration: 'none' }}>
-                      {log.job_title}
-                    </a>
+        {/* Data Table */}
+        <div className="table-card" style={cardStyle}>
+          {isLoading ? (
+            <div className="loading-state" style={{ textAlign: 'center', padding: '40px', color: theme.colors.textSecondary }}>
+              ⏳ Loading data from Excel...
+            </div>
+          ) : (
+            <div className="table-container">
+              <table className="activity-table">
+                <thead>
+                  <tr>
+                    <th style={{ color: theme.colors.text }}>Date</th>
+                    <th style={{ color: theme.colors.text }}>Job Title</th>
+                    <th style={{ color: theme.colors.text }}>Company</th>
+                    <th style={{ color: theme.colors.text }}>Platform</th>
+                    <th style={{ color: theme.colors.text }}>Email</th>
+                    <th style={{ color: theme.colors.text }}>Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {paginatedLogs.length > 0 ? (
+                    paginatedLogs.map((log) => {
+                      const statusStyle = getStatusColor(log.status);
+                      return (
+                        <tr key={log.id} style={{ borderBottom: `1px solid ${theme.colors.border}` }}>
+                          <td style={{ color: theme.colors.textSecondary }}>
+                            {log.timestamp ? new Date(log.timestamp).toLocaleString() : '-'}
+                          </td>
+                          <td style={{ color: theme.colors.text }}>
+                            {log.source_url ? (
+                              <a
+                                href={log.source_url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                style={{ color: theme.colors.primary }}
+                              >
+                                {log.job_title || '-'}
+                              </a>
+                            ) : (
+                              log.job_title || '-'
+                            )}
+                          </td>
+                          <td style={{ color: theme.colors.text }}>{log.company || '-'}</td>
+                          <td style={{ color: theme.colors.textSecondary }}>{log.platform || '-'}</td>
+                          <td style={{ color: theme.colors.textSecondary, fontSize: '0.85rem' }}>
+                            {log.to_email || '-'}
+                          </td>
+                          <td>
+                            <span
+                              className="status-badge"
+                              style={{
+                                backgroundColor: statusStyle.bg,
+                                color: statusStyle.text
+                              }}
+                            >
+                              {log.status || 'Unknown'}
+                            </span>
+                          </td>
+                        </tr>
+                      );
+                    })
                   ) : (
-                    log.job_title
+                    <tr>
+                      <td colSpan="6" style={{ textAlign: 'center', padding: '40px', color: theme.colors.textSecondary }}>
+                        {totalLogs === 0 ? 'No activity data. Run a job search to see results here.' : 'No matching records found.'}
+                      </td>
+                    </tr>
                   )}
-                </td>
-                <td style={{ padding: '15px', color: theme.colors.text }}>{log.company}</td>
-                <td style={{ padding: '15px', color: theme.colors.text, fontSize: '0.9rem' }}>{log.to_email}</td>
-                <td style={{ padding: '15px' }}>
-                  <span style={{
-                    padding: '6px 12px',
-                    borderRadius: '4px',
-                    backgroundColor: getStatusColor(log.status),
-                    color: theme.colors.headerText,
-                    fontWeight: 'bold',
-                    fontSize: '0.85rem',
-                    whiteSpace: 'nowrap'
-                  }}>
-                    {log.status}
-                  </span>
-                </td>
-                <td style={{ padding: '15px', color: theme.colors.danger, fontSize: '0.9rem' }}>
-                  {log.error_message || '-'}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-
-      {filteredLogs.length === 0 && (
-        <div style={{ padding: '40px', textAlign: 'center', color: theme.colors.textSecondary }}>
-          <p>No activity logs available</p>
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
-      )}
 
-      {totalPages > 1 && (
-        <div className="pagination" style={{ display: 'flex', justifyContent: 'center', gap: '10px', marginTop: '20px', alignItems: 'center' }}>
-          <button
-            onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
-            disabled={currentPage === 1}
-            style={{
-              padding: '8px 12px',
-              backgroundColor: currentPage === 1 ? theme.colors.border : theme.colors.secondary,
-              color: theme.colors.headerText,
-              border: 'none',
-              borderRadius: '4px',
-              cursor: currentPage === 1 ? 'not-allowed' : 'pointer'
-            }}
-          >
-            Previous
-          </button>
-          
-          {[...Array(totalPages)].map((_, i) => (
+        {/* Pagination */}
+        {totalPages > 1 && (
+          <div className="pagination">
             <button
-              key={i + 1}
-              onClick={() => setCurrentPage(i + 1)}
-              style={{
-                padding: '8px 12px',
-                backgroundColor: currentPage === i + 1 ? theme.colors.secondary : theme.colors.background,
-                color: currentPage === i + 1 ? theme.colors.headerText : theme.colors.text,
-                border: `1px solid ${theme.colors.border}`,
-                borderRadius: '4px',
-                cursor: 'pointer'
-              }}
+              onClick={() => setCurrentPage(1)}
+              disabled={currentPage === 1}
+              style={{ backgroundColor: theme.colors.surface, color: theme.colors.text }}
             >
-              {i + 1}
+              ««
             </button>
-          ))}
-          
-          <button
-            onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
-            disabled={currentPage === totalPages}
-            style={{
-              padding: '8px 12px',
-              backgroundColor: currentPage === totalPages ? theme.colors.border : theme.colors.secondary,
-              color: theme.colors.headerText,
-              border: 'none',
-              borderRadius: '4px',
-              cursor: currentPage === totalPages ? 'not-allowed' : 'pointer'
-            }}
-          >
-            Next
-          </button>
-        </div>
-      )}
+            <button
+              onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+              disabled={currentPage === 1}
+              style={{ backgroundColor: theme.colors.surface, color: theme.colors.text }}
+            >
+              ‹
+            </button>
+
+            <span style={{ color: theme.colors.text, padding: '0 16px' }}>
+              Page {currentPage} of {totalPages}
+            </span>
+
+            <button
+              onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
+              disabled={currentPage === totalPages}
+              style={{ backgroundColor: theme.colors.surface, color: theme.colors.text }}
+            >
+              ›
+            </button>
+            <button
+              onClick={() => setCurrentPage(totalPages)}
+              disabled={currentPage === totalPages}
+              style={{ backgroundColor: theme.colors.surface, color: theme.colors.text }}
+            >
+              »»
+            </button>
+          </div>
+        )}
+      </div>
     </div>
   );
 };

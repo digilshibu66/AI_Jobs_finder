@@ -1,34 +1,98 @@
-"""Generate motivational letters for job applications using Gemini AI."""
+"""Generate motivational letters for job applications using OpenRouter API."""
 
 import os
 import re
-try:
-    import google.generativeai as genai
-except Exception:
-    genai = None
+import requests
+import json
+import time
+import random
 
 
-def _configure_gemini():
-    """Configure Gemini API."""
-    if genai is None:
-        raise RuntimeError("google.generativeai not installed.")
-    genai.configure(api_key=os.environ.get("GEMINI_API_KEY"))
+def _get_openrouter_api_key():
+    """Get OpenRouter API key from environment variables."""
+    api_key = os.environ.get("OPENROUTER_API_KEY")
+    if not api_key:
+        raise RuntimeError("OPENROUTER_API_KEY environment variable is not set.")
+    return api_key
+
+def _call_openrouter_api(messages, model=None, max_retries=5):
+    """Call OpenRouter API with messages and return response."""
+    api_key = _get_openrouter_api_key()
+    
+    # Use the correct endpoint that resolves properly
+    url = "https://openrouter.ai/api/v1/chat/completions"
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json",
+        "HTTP-Referer": "https://github.com/freelance-mailer",  # Optional, for tracking
+        "X-Title": "Freelance Mailer"  # Optional, for tracking
+    }
+    
+    # Use default model if none provided
+    if model is None:
+        model = "nousresearch/hermes-3-llama-3.1-405b:free"
+    
+    data = {
+        "model": model,
+        "messages": messages
+    }
+    
+    # Enhanced exponential backoff for rate limiting with longer delays
+    for attempt in range(max_retries):
+        try:
+            response = requests.post(url, headers=headers, json=data)
+            if response.status_code == 429:
+                # Rate limited - implement enhanced exponential backoff with longer delays
+                # Base delay of 15 seconds with exponential growth (free models need more time)
+                wait_time = (15 * (2 ** attempt)) + random.uniform(0, 5)
+                print(f"  [RATE_LIMIT] Hit rate limit. Waiting {wait_time:.2f} seconds before retry {attempt + 1}/{max_retries}...")
+                time.sleep(wait_time)
+                continue
+            response.raise_for_status()
+            
+            result = response.json()
+            return result['choices'][0]['message']['content']
+        except requests.exceptions.HTTPError as e:
+            if e.response.status_code == 429 and attempt < max_retries - 1:
+                # Rate limited - implement enhanced exponential backoff with longer delays
+                wait_time = (15 * (2 ** attempt)) + random.uniform(0, 5)
+                print(f"  [RATE_LIMIT] Hit rate limit. Waiting {wait_time:.2f} seconds before retry {attempt + 1}/{max_retries}...")
+                time.sleep(wait_time)
+                continue
+            else:
+                print(f"  [API_ERROR] Status: {e.response.status_code}")
+                print(f"  [API_ERROR] Response: {e.response.text}")
+                raise
+        except Exception as e:
+            if attempt < max_retries - 1:
+                wait_time = (15 * (2 ** attempt)) + random.uniform(0, 5)
+                print(f"  [ERROR] API call failed: {e}. Waiting {wait_time:.2f} seconds before retry {attempt + 1}/{max_retries}...")
+                time.sleep(wait_time)
+                continue
+            else:
+                raise
+    
+    raise Exception(f"Failed to call OpenRouter API after {max_retries} attempts")
 
 
-def generate_motivational_letter(job_title, job_description, resume_text):
+def generate_motivational_letter(job_title, job_description, resume_text, ai_model=None):
     """Generate a motivational letter for a specific job application.
     
     Args:
         job_title (str): The title of the job position
         job_description (str): Detailed description of the job requirements
         resume_text (str): The applicant's resume text
+        ai_model (str): The AI model to use for generation
         
     Returns:
         str: Generated motivational letter content
     """
-    _configure_gemini()
+    _get_openrouter_api_key()
     
-    prompt = f"""
+    messages = [
+        {
+            "role": "user",
+            "content": f"""
 Create a compelling motivational letter for a job application that demonstrates why I'm the perfect candidate for this position.
 
 Job Title: {job_title}
@@ -60,10 +124,11 @@ Important guidelines:
 
 Return only the motivational letter content with no additional explanations or formatting.
 """
+        }
+    ]
 
-    model = genai.GenerativeModel("gemini-2.0-flash")
-    resp = model.generate_content(prompt)
-    return resp.text.strip()
+    response = _call_openrouter_api(messages, ai_model)
+    return response.strip()
 
 
 def save_motivational_letter_as_pdf(letter_content, output_path):
