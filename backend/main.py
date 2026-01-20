@@ -7,6 +7,7 @@ import argparse
 import sys
 import os
 import re
+import time
 from dotenv import load_dotenv
 
 # Add the current directory to Python path
@@ -47,7 +48,7 @@ def load_config():
         'job_category': os.getenv('JOB_CATEGORY', 'freelance'),  # freelance or normal
         'job_limit': int(os.getenv('JOB_LIMIT', '30')),
         'motivational_letter': os.getenv('GENERATE_MOTIVATIONAL_LETTER', 'true').lower() == 'true',
-        'ai_model': os.getenv('AI_MODEL', 'nousresearch/hermes-3-llama-3.1-405b:free'),
+        'ai_model': os.getenv('AI_MODEL', 'meta-llama/llama-3.3-70b-instruct:free'),
         'location': os.getenv('LOCATION'),
         'job_name': os.getenv('JOB_NAME')
     }
@@ -118,7 +119,7 @@ def run(resume_path, smtp_email, smtp_password,
         job_type='software',
         job_category='freelance',
         job_field='tech',
-        ai_model='nousresearch/hermes-3-llama-3.1-405b:free',
+        ai_model='meta-llama/llama-3.3-70b-instruct:free',
         location=None,
         job_name=None,
         process_retries=True):
@@ -392,7 +393,7 @@ if __name__ == '__main__':
     parser.add_argument('--keywords', default='', help='Keywords to search for (comma-separated)')
     parser.add_argument('--job-field', default='tech', help='Job field to search for (tech, marketing, design, business, healthcare, finance, education, legal, manufacturing, hospitality, nonprofit, pharma, agriculture, construction, retail, other)')
     parser.add_argument('--generate-motivational-letter', action='store_true', default=config['motivational_letter'], help='Generate motivational letter (default: true)' )
-    parser.add_argument('--ai-model', default='nousresearch/hermes-3-llama-3.1-405b:free', help='AI model to use for generation (default: nousresearch/hermes-3-llama-3.1-405b:free). See README for available models.')
+    parser.add_argument('--ai-model', default='meta-llama/llama-3.3-70b-instruct:free', help='AI model to use for generation (default: meta-llama/llama-3.3-70b-instruct:free). See README for available models.')
     parser.add_argument('--location', help='Location to search for jobs')
     parser.add_argument('--job-name', help='Specific job name to search for')
     

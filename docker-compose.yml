@@ -13,7 +13,7 @@ services:
       - RESUME_PATH=/app/resume.pdf
       - GOOGLE_SEARCH_API_KEY=${GOOGLE_SEARCH_API_KEY}
       - GOOGLE_SEARCH_ENGINE_ID=${GOOGLE_SEARCH_ENGINE_ID}
-      - AI_MODEL=${AI_MODEL:-google/gemini-2.0-flash-exp:free}
+      - AI_MODEL=${AI_MODEL:-google/gemini-2.0-flash:free}
     volumes:
       - .:/app
       - ./resume.pdf:/app/resume.pdf

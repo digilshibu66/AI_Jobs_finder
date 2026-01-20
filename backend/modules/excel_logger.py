@@ -99,7 +99,8 @@ class EmailLogger:
                     df.loc[mask, 'status'] = status
                     df.loc[mask, 'timestamp'] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                     if error_message:
-                        df.loc[mask, 'error_message'] = error_message
+                        df['error_message'] = df['error_message'].astype(object)
+                        df.loc[mask, 'error_message'] = str(error_message)
             else:
                 # Create new entry
                 new_entry = {

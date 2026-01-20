@@ -2,17 +2,15 @@ import { useState, useRef } from 'react';
 import { useTheme } from '../context/ThemeContext';
 import '../styles/JobsPage.css';
 
-// Verified working free models (updated Jun 2025)
+// ACTUAL verified free models from OpenRouter API (Jan 2026)
 const FREE_MODELS = [
-    { value: 'google/gemini-2.0-flash-exp:free', label: 'Gemini 2.0 Flash', group: 'Google', recommended: true },
-    { value: 'meta-llama/llama-3.3-70b-instruct:free', label: 'Llama 3.3 70B', group: 'Meta' },
+    { value: 'meta-llama/llama-3.3-70b-instruct:free', label: 'Llama 3.3 70B', group: 'Meta', recommended: true },
     { value: 'qwen/qwen3-coder:free', label: 'Qwen3 Coder', group: 'Alibaba' },
-    { value: 'mistralai/mistral-small-3.1-24b-instruct:free', label: 'Mistral Small 3.1', group: 'Mistral' },
-    { value: 'google/gemma-3-27b-it:free', label: 'Gemma 3 27B', group: 'Google' },
-    { value: 'google/gemma-3-12b-it:free', label: 'Gemma 3 12B', group: 'Google' },
+    { value: 'mistralai/devstral-2512:free', label: 'Devstral 2512', group: 'Mistral' },
+    { value: 'nousresearch/hermes-3-llama-3.1-405b:free', label: 'Hermes 3 Llama 405B', group: 'NousResearch' },
     { value: 'meta-llama/llama-3.2-3b-instruct:free', label: 'Llama 3.2 3B', group: 'Meta' },
+    { value: 'openai/gpt-oss-120b:free', label: 'GPT OSS 120B', group: 'OpenAI' },
     { value: 'qwen/qwen3-4b:free', label: 'Qwen3 4B', group: 'Alibaba' },
-    { value: 'qwen/qwen3-235b-a22b:free', label: 'Qwen3 235B', group: 'Alibaba' },
 ];
 
 const JobsPage = () => {
@@ -22,7 +20,7 @@ const JobsPage = () => {
     const [jobName, setJobName] = useState('');
     const [location, setLocation] = useState('');
     const [jobLimit, setJobLimit] = useState(30);
-    const [aiModel, setAiModel] = useState('google/gemini-2.0-flash-exp:free');
+    const [aiModel, setAiModel] = useState('meta-llama/llama-3.3-70b-instruct:free');
     const [sendEmails, setSendEmails] = useState(false);
     const [generateLetter, setGenerateLetter] = useState(true);
     const [isRunning, setIsRunning] = useState(false);

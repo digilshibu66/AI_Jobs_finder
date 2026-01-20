@@ -2,22 +2,20 @@ import { useState, useEffect } from 'react';
 import { useTheme } from '../context/ThemeContext';
 import '../styles/SettingsPage.css';
 
-// Verified working free models
+// ACTUAL verified free models from OpenRouter API (Jan 2026)
 const FREE_MODELS = [
-    { value: 'google/gemini-2.0-flash-exp:free', label: 'Gemini 2.0 Flash', group: 'Google', recommended: true, description: 'Fast and reliable, great for general use' },
-    { value: 'meta-llama/llama-3.3-70b-instruct:free', label: 'Llama 3.3 70B', group: 'Meta', description: 'Large model, professional tone' },
+    { value: 'meta-llama/llama-3.3-70b-instruct:free', label: 'Llama 3.3 70B', group: 'Meta', recommended: true, description: 'Large model, professional tone' },
     { value: 'qwen/qwen3-coder:free', label: 'Qwen3 Coder', group: 'Alibaba', description: 'Optimized for technical content' },
-    { value: 'mistralai/mistral-small-3.1-24b-instruct:free', label: 'Mistral Small 3.1', group: 'Mistral', description: 'Balanced performance and quality' },
-    { value: 'google/gemma-3-27b-it:free', label: 'Gemma 3 27B', group: 'Google', description: 'Instruction-tuned for tasks' },
-    { value: 'google/gemma-3-12b-it:free', label: 'Gemma 3 12B', group: 'Google', description: 'Smaller, faster responses' },
+    { value: 'mistralai/devstral-2512:free', label: 'Devstral 2512', group: 'Mistral', description: 'Agentic coder model' },
+    { value: 'nousresearch/hermes-3-llama-3.1-405b:free', label: 'Hermes 3 Llama 405B', group: 'NousResearch', description: 'Largest free model' },
     { value: 'meta-llama/llama-3.2-3b-instruct:free', label: 'Llama 3.2 3B', group: 'Meta', description: 'Lightweight and fast' },
+    { value: 'openai/gpt-oss-120b:free', label: 'GPT OSS 120B', group: 'OpenAI', description: 'High reasoning capabilities' },
     { value: 'qwen/qwen3-4b:free', label: 'Qwen3 4B', group: 'Alibaba', description: 'Efficient small model' },
-    { value: 'qwen/qwen3-235b-a22b:free', label: 'Qwen3 235B', group: 'Alibaba', description: 'Largest free model available' },
 ];
 
 const SettingsPage = () => {
     const { theme } = useTheme();
-    const [selectedModel, setSelectedModel] = useState('google/gemini-2.0-flash-exp:free');
+    const [selectedModel, setSelectedModel] = useState('meta-llama/llama-3.3-70b-instruct:free');
     const [savedMessage, setSavedMessage] = useState('');
 
     const cardStyle = {

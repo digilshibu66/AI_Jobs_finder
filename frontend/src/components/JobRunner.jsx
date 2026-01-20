@@ -9,7 +9,7 @@ const JobRunner = ({ onRunComplete }) => {
   const [jobField, setJobField] = useState('tech');
   const [keywords, setKeywords] = useState('');
   const [jobLimit, setJobLimit] = useState(30);
-  const [aiModel, setAiModel] = useState('google/gemini-2.0-flash-exp:free');
+  const [aiModel, setAiModel] = useState('meta-llama/llama-3.3-70b-instruct:free');
   const [location, setLocation] = useState('');
   const [jobName, setJobName] = useState('');
   const [useEnvMethod, setUseEnvMethod] = useState(false);
@@ -18,39 +18,15 @@ const JobRunner = ({ onRunComplete }) => {
   const [logOutput, setLogOutput] = useState('');
   const [isRunning, setIsRunning] = useState(false);
 
-  // Define all available free models
+  // ACTUAL verified free models from OpenRouter API (Jan 2026)
   const freeModels = [
-    { value: 'nousresearch/hermes-3-llama-3.1-405b:free', label: 'Hermes 3 Llama 3.1 405B (Free)' },
-    { value: 'mistralai/devstral-2512:free', label: 'DevStral 2512 (Free)' },
-    { value: 'nex-agi/deepseek-v3.1-nex-n1:free', label: 'DeepSeek V3.1 NEX N1 (Free)' },
-    { value: 'amazon/nova-2-lite-v1:free', label: 'Amazon Nova 2 Lite V1 (Free)' },
-    { value: 'arcee-ai/trinity-mini:free', label: 'Arcee Trinity Mini (Free)' },
-    { value: 'tngtech/tng-r1t-chimera:free', label: 'TNG R1T Chimera (Free)' },
-    { value: 'allenai/olmo-3-32b-think:free', label: 'OLMo 3 32B Think (Free)' },
-    { value: 'kwaipilot/kat-coder-pro:free', label: 'KAT Coder Pro (Free)' },
-    { value: 'nvidia/nemotron-nano-12b-v2-vl:free', label: 'Nemotron Nano 12B V2 VL (Free)' },
-    { value: 'alibaba/tongyi-deepresearch-30b-a3b:free', label: 'Tongyi DeepResearch 30B A3B (Free)' },
-    { value: 'nvidia/nemotron-nano-9b-v2:free', label: 'Nemotron Nano 9B V2 (Free)' },
-    { value: 'openai/gpt-oss-120b:free', label: 'OpenAI GPT OSS 120B (Free)' },
-    { value: 'openai/gpt-oss-20b:free', label: 'OpenAI GPT OSS 20B (Free)' },
-    { value: 'z-ai/glm-4.5-air:free', label: 'GLM 4.5 Air (Free)' },
-    { value: 'qwen/qwen3-coder:free', label: 'Qwen3 Coder (Free)' },
-    { value: 'moonshotai/kimi-k2:free', label: 'Kimi K2 (Free)' },
-    { value: 'cognitivecomputations/dolphin-mistral-24b-venice-edition:free', label: 'Dolphin Mistral 24B Venice Edition (Free)' },
-    { value: 'google/gemma-3n-e2b-it:free', label: 'Gemma 3N E2B IT (Free)' },
-    { value: 'tngtech/deepseek-r1t2-chimera:free', label: 'DeepSeek R1T2 Chimera (Free)' },
-    { value: 'google/gemma-3n-e4b-it:free', label: 'Gemma 3N E4B IT (Free)' },
-    { value: 'qwen/qwen3-4b:free', label: 'Qwen3 4B (Free)' },
-    { value: 'qwen/qwen3-235b-a22b:free', label: 'Qwen3 235B A22B (Free)' },
-    { value: 'tngtech/deepseek-r1t-chimera:free', label: 'DeepSeek R1T Chimera (Free)' },
-    { value: 'mistralai/mistral-small-3.1-24b-instruct:free', label: 'Mistral Small 3.1 24B Instruct (Free)' },
-    { value: 'google/gemma-3-4b-it:free', label: 'Gemma 3 4B IT (Free)' },
-    { value: 'google/gemma-3-12b-it:free', label: 'Gemma 3 12B IT (Free)' },
-    { value: 'google/gemma-3-27b-it:free', label: 'Gemma 3 27B IT (Free)' },
-    { value: 'google/gemini-2.0-flash-exp:free', label: 'Gemini 2.0 Flash EXP (Free)' },
-    { value: 'meta-llama/llama-3.3-70b-instruct:free', label: 'Llama 3.3 70B Instruct (Free)' },
-    { value: 'meta-llama/llama-3.2-3b-instruct:free', label: 'Llama 3.2 3B Instruct (Free)' },
-    { value: 'mistralai/mistral-7b-instruct:free', label: 'Mistral 7B Instruct (Free)' }
+    { value: 'meta-llama/llama-3.3-70b-instruct:free', label: '⭐ Llama 3.3 70B - Recommended' },
+    { value: 'qwen/qwen3-coder:free', label: 'Qwen3 Coder - Best for Technical' },
+    { value: 'mistralai/devstral-2512:free', label: 'Devstral 2512 - Agentic Coder' },
+    { value: 'nousresearch/hermes-3-llama-3.1-405b:free', label: 'Hermes 3 Llama 405B - Largest' },
+    { value: 'meta-llama/llama-3.2-3b-instruct:free', label: 'Llama 3.2 3B - Fast' },
+    { value: 'openai/gpt-oss-120b:free', label: 'GPT OSS 120B' },
+    { value: 'qwen/qwen3-4b:free', label: 'Qwen3 4B - Lightweight' }
   ];
 
   const runJobs = async () => {

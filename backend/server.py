@@ -192,7 +192,7 @@ def run_jobs():
         job_limit = data.get('jobLimit', 30)
         send_emails = data.get('sendEmails', False)
         generate_motivational_letter = data.get('generateMotivationalLetter', True)
-        ai_model = data.get('aiModel', 'google/gemini-2.0-flash-exp:free')
+        ai_model = data.get('aiModel', 'meta-llama/llama-3.3-70b-instruct:free')
         location = data.get('location')
         job_name = data.get('jobName')
         
@@ -257,7 +257,7 @@ def run_jobs_stream():
         job_limit = data.get('jobLimit', 30)
         send_emails = data.get('sendEmails', False)
         generate_motivational_letter = data.get('generateMotivationalLetter', True)
-        ai_model = data.get('aiModel', 'google/gemini-2.0-flash-exp:free')
+        ai_model = data.get('aiModel', 'meta-llama/llama-3.3-70b-instruct:free')
         location = data.get('location')
         job_name = data.get('jobName')
         
@@ -328,7 +328,7 @@ def run_jobs_modified():
         job_category = data.get('jobCategory', 'freelance')
         job_limit = data.get('jobLimit', 30)
         generate_motivational_letter = data.get('generateMotivationalLetter', True)
-        ai_model = data.get('aiModel', 'nousresearch/hermes-3-llama-3.1-405b:free')
+        ai_model = data.get('aiModel', 'meta-llama/llama-3.3-70b-instruct:free')
         location = data.get('location')
         job_name = data.get('jobName')
         

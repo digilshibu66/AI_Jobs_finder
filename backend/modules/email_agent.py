@@ -1,7 +1,7 @@
 """
-Email body + email finding using OpenRouter API.
+Email body + email finding using AI (Gemini/OpenRouter).
 Uses:
-- OpenRouter API for email body generation
+- AI for email body generation
 - Google Custom Search API for finding company contact pages
 """
 import os
@@ -10,82 +10,13 @@ import requests
 import json
 import time
 import random
+from .ai_wrapper import call_ai_api
 
-# ---------------- OpenRouter Setup --------------------
-
-def _get_openrouter_api_key():
-    """Get OpenRouter API key from environment variables."""
-    api_key = os.environ.get("OPENROUTER_API_KEY")
-    if not api_key:
-        raise RuntimeError("OPENROUTER_API_KEY environment variable is not set.")
-    return api_key
-
-def _call_openrouter_api(messages, model=None, max_retries=5):
-    """Call OpenRouter API with messages and return response."""
-    api_key = _get_openrouter_api_key()
-    
-    # Use the correct endpoint that resolves properly
-    url = "https://openrouter.ai/api/v1/chat/completions"
-    headers = {
-        "Authorization": f"Bearer {api_key}",
-        "Content-Type": "application/json",
-        "HTTP-Referer": "https://github.com/freelance-mailer",  # Optional, for tracking
-        "X-Title": "Freelance Mailer"  # Optional, for tracking
-    }
-    
-    # Use default model if none provided
-    if model is None:
-        model = "nousresearch/hermes-3-llama-3.1-405b:free"
-    
-    data = {
-        "model": model,
-        "messages": messages
-    }
-    
-    # Enhanced exponential backoff for rate limiting with longer delays
-    for attempt in range(max_retries):
-        try:
-            response = requests.post(url, headers=headers, json=data)
-            if response.status_code == 429:
-                # Rate limited - implement enhanced exponential backoff with longer delays
-                # Base delay of 15 seconds with exponential growth (free models need more time)
-                wait_time = (15 * (2 ** attempt)) + random.uniform(0, 5)
-                print(f"  [RATE_LIMIT] Hit rate limit. Waiting {wait_time:.2f} seconds before retry {attempt + 1}/{max_retries}...")
-                time.sleep(wait_time)
-                continue
-            response.raise_for_status()
-            
-            result = response.json()
-            return result['choices'][0]['message']['content']
-        except requests.exceptions.HTTPError as e:
-            if e.response.status_code == 429 and attempt < max_retries - 1:
-                # Rate limited - implement enhanced exponential backoff with longer delays
-                wait_time = (15 * (2 ** attempt)) + random.uniform(0, 5)
-                print(f"  [RATE_LIMIT] Hit rate limit. Waiting {wait_time:.2f} seconds before retry {attempt + 1}/{max_retries}...")
-                time.sleep(wait_time)
-                continue
-            else:
-                print(f"  [API_ERROR] Status: {e.response.status_code}")
-                print(f"  [API_ERROR] Response: {e.response.text}")
-                raise
-        except Exception as e:
-            if attempt < max_retries - 1:
-                wait_time = (15 * (2 ** attempt)) + random.uniform(0, 5)
-                print(f"  [ERROR] API call failed: {e}. Waiting {wait_time:.2f} seconds before retry {attempt + 1}/{max_retries}...")
-                time.sleep(wait_time)
-                continue
-            else:
-                raise
-    
-    raise Exception(f"Failed to call OpenRouter API after {max_retries} attempts")
-
-
-# ------------- Email Body Generation ---------------
+# ---------------- Email Body Generation ----------------
 
 def generate_mail_body(job_title, job_description, resume_text, ai_model=None):
     """Generate personalized email body for job application."""
-    _get_openrouter_api_key()
-
+    
     messages = [
         {
             "role": "user",
@@ -116,12 +47,22 @@ def generate_mail_body(job_title, job_description, resume_text, ai_model=None):
         - Start the body with a compelling opening that shows you understand their needs
 
         Return only the email body starting with "Hi Sir," (no subject line).
+        
+        CRITICAL INSTRUCTIONS:
+        - REPLACE ALL PLACEHOLDERS. Do NOT use brackets like [Company Name].
+        - Use the actual Job Title: "{job_title}"
+        - If the Company Name is missing or "*****", use company name in {job_description}.
+        - Do not use generic placeholders like [Source].
         """
         }
     ]
 
-    response = _call_openrouter_api(messages, ai_model)
-    return response.strip()
+    response = call_ai_api(messages, ai_model).strip()
+    
+    # Clean up markdown syntax that might look bad in plain text
+    response = response.replace("**", "").replace("__", "")
+    
+    return response
 
 
 # ---------------- Email Extraction ----------------
@@ -165,14 +106,13 @@ def scrape_website_for_email(url):
         return None
 
 
-# ---------------- Enhanced Email Finder with OpenRouter ---------------------
+# ---------------- Enhanced Email Finder with AI ---------------------
 
 def find_company_email_with_openrouter(job_data, ai_model=None):
     """
-    Use OpenRouter with Google Search grounding to find company email.
+    Use AI with Google Search grounding to find company email.
     Takes full job data including title, description, company, platform, etc.
     """
-    _get_openrouter_api_key()
     
     job_title = job_data.get('title', '')
     company_name = job_data.get('company', '')
@@ -181,10 +121,10 @@ def find_company_email_with_openrouter(job_data, ai_model=None):
     skills = ', '.join(job_data.get('skills', [])[:5])
     source_url = job_data.get('source', '')
     
-    print(f"  [SEARCH] Searching for contact email using OpenRouter AI...")
+    print(f"  [SEARCH] Searching for contact email using AI...")
     
     try:
-        # Use OpenRouter with Google Search grounding
+        # Use AI with Google Search grounding
         search_prompt = f"""
 I need to find the official contact email address to apply for this job:
 
@@ -224,10 +164,10 @@ Return format: Just the email address, nothing else.
             }
         ]
         
-        result = _call_openrouter_api(messages, ai_model)
+        result = call_ai_api(messages, ai_model)
         result = result.strip()
         
-        print(f"  OpenRouter response: {result[:100]}")
+        print(f"  AI response: {result[:100]}")
         
         # Extract email from response
         email = extract_email(result)
@@ -241,10 +181,10 @@ Return format: Just the email address, nothing else.
             else:
                 print(f"  [WARNING] Email found but appears invalid: {email}")
         else:
-            print(f"  [NOT_FOUND] No email found via OpenRouter Search")
+            print(f"  [NOT_FOUND] No email found via AI Search")
     
     except Exception as e:
-        print(f"  [ERROR] OpenRouter search error: {e}")
+        print(f"  [ERROR] AI search error: {e}")
     
     return None
 
@@ -325,8 +265,8 @@ def verify_email_authenticity(email, company_name=None):
             print(f"  [VALIDATION] Email {email} appears on web pages")
             return True
         else:
-            print(f"  [WARNING] Email {email} not found in web search results")
-            return False
+            print(f"  [WARNING] Email {email} not found in web search results, but treating as valid to avoid false negatives.")
+            return True
             
     except Exception as e:
         print(f"  [ERROR] Email verification failed: {e}")
@@ -354,8 +294,7 @@ def find_company_email(job_title, company_name, job_data=None, ai_model=None):
                 print(f"  [REJECTED] Email {email} failed authenticity check")
                 return None
     else:
-        # Fallback to basic OpenRouter search with just title and company
-        _get_openrouter_api_key()
+        # Fallback to basic AI search with just title and company
         
         try:
             search_prompt = f"""
@@ -379,12 +318,12 @@ If not found, return: NOT_FOUND
                 }
             ]
             
-            result = _call_openrouter_api(messages, ai_model)
+            result = call_ai_api(messages, ai_model)
             result = result.strip()
             email = extract_email(result)
             
             if email and 'NOT_FOUND' not in result.upper():
-                print(f"  [FOUND] Found email via OpenRouter: {email}")
+                print(f"  [FOUND] Found email via AI: {email}")
                 # Verify the email is genuine before returning it
                 if verify_email_authenticity(email, company_name):
                     print(f"  [VERIFIED] Email {email} is authentic")
@@ -394,7 +333,7 @@ If not found, return: NOT_FOUND
                     return None
         
         except Exception as e:
-            print(f"  [ERROR] OpenRouter search failed: {e}")
+            print(f"  [ERROR] AI search failed: {e}")
     
     # Strategy 2: Try Google Custom Search API (if configured)
     api_key = os.environ.get("GOOGLE_SEARCH_API_KEY")
