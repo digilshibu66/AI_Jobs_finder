@@ -17,7 +17,7 @@ An intelligent automated tool that scrapes job websites, generates **personalize
 
 ## 🏗️ System Architecture
 
-```
+```mermaid
 graph TD
     A[User] --> B[Web Dashboard / CLI]
     B --> C[Main Controller]
@@ -37,29 +37,14 @@ graph TD
     G --> P[Excel Logger]
     G --> Q[PDF Generator]
 ```
+
 ---
 
-## 🚀 Quick Start (Docker)
+## ⚙️ Configuration (Required for Both Methods)
 
-The easiest way to run the application is using Docker.
+Before running (Docker or Manual), you must configure the project:
 
-### 1. Prerequisites
-
-- Docker & Docker Compose installed
-- OpenRouter API Key (Get a free key from [openrouter.ai](https://openrouter.ai/))
-- Gmail Account (with [App Password](https://myaccount.google.com/apppasswords) enabled)
-- PDF Resume
-
-### 2. Setup
-
-1. **Clone the repository:**
-
-   ```bash
-   git clone <repository-url>
-   cd freelance_mailer_package
-   ```
-
-2. **Configure Environment:**
+1. **Configure Environment:**
    Copy `.env.example` to `.env` and fill in your details:
 
    ```bash
@@ -72,20 +57,75 @@ The easiest way to run the application is using Docker.
    OPENROUTER_API_KEY=sk-or-v1-xxxxxxxx...
    SMTP_EMAIL=your_email@gmail.com
    SMTP_PASSWORD=xxxx xxxx xxxx xxxx  # 16-char App Password
-   RESUME_PATH=./resume.pdf           # Place resume.pdf in project root
+   RESUME_PATH=D:\My projects\freelance_mailer_package\resume.pdf  # Absolute path to resume
    AI_MODEL=meta-llama/llama-3.3-70b-instruct:free
    ```
 
-3. **Place Resume:**
-   Put your `resume.pdf` in the root directory.
+2. **Place Resume:**
+   Ensure your `resume.pdf` exists at the path specified in `RESUME_PATH`.
 
-### 3. Run
+---
 
-```bash
-docker-compose up -d --build
-```
+## 🚀 Installation & Usage
 
-Access the dashboard at: **<http://localhost:3000>** (or port defined in docker-compose)
+You can run the application either using **Docker** (Recommended) or **Manually**.
+
+### Option 1: Docker (Fastest)
+
+1. **Run:**
+
+   ```bash
+   docker-compose up -d --build
+   ```
+
+2. **Access:**
+   Dashboard: **<http://localhost:3000>**
+   Backend API: **<http://localhost:5000>**
+
+3. **Stop:**
+
+   ```bash
+   docker-compose down
+   ```
+
+### Option 2: Manual Installation
+
+If you prefer running locally without Docker:
+
+1. **Install Backend:**
+
+   ```bash
+   cd backend
+   pip install -r requirements.txt
+   ```
+
+2. **Install Frontend:**
+
+   ```bash
+   cd frontend
+   npm install
+   ```
+
+3. **Run Application:**
+   You need two terminals:
+
+   **Terminal 1 (Backend):**
+
+   ```bash
+   cd backend
+   python server.py
+   ```
+
+   *Server starts at <http://localhost:5000>*
+
+   **Terminal 2 (Frontend):**
+
+   ```bash
+   cd frontend
+   npm run dev
+   ```
+
+   *Dashboard starts at <http://localhost:3000>*
 
 ---
 
@@ -113,37 +153,6 @@ Access the dashboard at: **<http://localhost:3000>** (or port defined in docker-
 
 ---
 
-## 💻 Manual Installation (No Docker)
-
-If you prefer running locally without Docker:
-
-1. **Install Dependencies:**
-
-   ```bash
-   # Backend
-   cd backend
-   pip install -r requirements.txt
-
-   # Frontend
-   cd ../frontend
-   npm install
-   ```
-
-2. **Run Backend:**
-
-   ```bash
-   python backend/server.py
-   ```
-
-3. **Run Frontend:**
-
-   ```bash
-   cd frontend
-   npm run dev
-   ```
-
----
-
 ## 🛠️ Troubleshooting
 
 ### 1. SMTP Authentication Error (535, 5.7.8)
@@ -165,11 +174,6 @@ If you prefer running locally without Docker:
 
 **Cause:** Email doesn't appear in Google Search results.
 **Fix:** The system now logs a warning but **accepts** the email to prevent blocking valid addresses.
-
-### 5. Markdown in Emails (`**Hi Sir**`)
-
-**Cause:** AI formatting.
-**Fix:** The system now automatically strips markdown artifacts from the final email body.
 
 ---
 
