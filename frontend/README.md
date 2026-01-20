@@ -2,131 +2,90 @@
 
 A modern React dashboard for the Jobs Mail Sender application that provides a visual interface for monitoring and controlling job applications.
 
-## Features
+## ✨ Key Features
 
-- **Real-time Statistics**: Visual charts and metrics for job application success rates
-- **Activity Logs**: Detailed table view of all job applications with status tracking
-- **One-Click Execution**: Run job searches directly from the dashboard with configurable parameters
-- **Live Output**: Real-time log output during job processing
-- **Data Refresh**: Manual refresh capability for up-to-date statistics
+- **Real-time Statistics**: Interactive charts showing success/failure rates.
+- **AI Model Selection**: Choose from 30+ verified free OpenRouter models (Llama, Mistral, Qwen).
+- **One-Click Job Search**: Configure and run job scraping directly.
+- **Live Monitoring**: Watch real-time logs as the backend processes jobs.
+- **Activity History**: Searchable table of all past applications.
+- **Dark/Light Mode**: Fully responsive theme support.
 
-## Tech Stack
+## 🛠️ Tech Stack
 
-- **React** - Frontend framework
-- **Vite** - Build tool and development server
-- **Chart.js** - Data visualization
-- **React Chartjs 2** - React wrapper for Chart.js
-- **CSS Modules** - Styling
+- **React** (Vite)
+- **Chart.js**
+- **React Router**
+- **CSS Modules**
 
-## Project Structure
+## 📂 Project Structure
 
 ```
 frontend/
-├── public/                 # Static assets
 ├── src/
-│   ├── components/         # React components
-│   │   ├── Dashboard.jsx   # Main dashboard component
-│   │   ├── JobStats.jsx    # Statistics visualization
-│   │   ├── JobRunner.jsx   # Job execution controls
-│   │   └── JobLogs.jsx     # Activity log display
-│   ├── styles/             # CSS stylesheets
-│   ├── App.jsx             # Main application component
-│   └── main.jsx            # Application entry point
-├── index.html              # HTML template
-├── vite.config.js          # Vite configuration
-└── package.json            # Project dependencies
+│   ├── components/
+│   │   ├── Dashboard.jsx   # Home stats
+│   │   ├── JobsPage.jsx    # Main job runner (New)
+│   │   ├── SettingsPage.jsx# Configuration & Models (New)
+│   │   ├── ActivityPage.jsx# Historical logs
+│   │   └── Navbar.jsx      # Navigation
+│   ├── context/            # React Context (Theme)
+│   ├── styles/             # Application styles
+│   └── App.jsx             # Routes
 ```
 
-## Getting Started
-
-### Prerequisites
-
-- Node.js 16+ (Recommended: Node.js 18+)
-- npm or yarn
+## 🚀 Getting Started
 
 ### Installation
 
-1. Navigate to the frontend directory:
-   ```bash
-   cd frontend
-   ```
-
-2. Install dependencies:
-   ```bash
-   npm install
-   ```
+```bash
+cd frontend
+npm install
+```
 
 ### Development
 
-Start the development server:
 ```bash
 npm run dev
 ```
 
-The dashboard will be available at http://localhost:3001
+Access at: `http://localhost:3000` (or `3001` depending on port availability)
 
-### Building for Production
+## 🧩 Components
 
-Create a production build:
-```bash
-npm run build
-```
+### Jobs Page (`JobsPage.jsx`)
 
-Preview the production build:
-```bash
-npm run preview
-```
+The command center.
 
-## Components
+- **Select AI Model**: Choose which LLM generates your emails.
+- **Search Parameters**: Set Job Title, Location, and Limit.
+- **Dry Run Mode**: Test without sending emails.
+- **Live Terminal**: View backend processing logs in real-time.
 
-### Dashboard (`Dashboard.jsx`)
+### Activity Page (`ActivityPage.jsx`)
 
-The main dashboard component that orchestrates all other components and manages data flow.
+Your application history.
 
-### Job Statistics (`JobStats.jsx`)
+- View all sent emails.
+- Filter by status (Success, Failed, Initializing).
+- View error logs for rejected emails.
 
-Displays application statistics using bar charts and summary cards:
-- Total jobs processed
-- Success rate
-- Failure rate
-- Skipped jobs
-- Dry run jobs
+### Settings Page (`SettingsPage.jsx`)
 
-### Job Runner (`JobRunner.jsx`)
+Global configuration.
 
-Provides a form interface for configuring and running job searches:
-- Job category selection (freelance/normal)
-- Job type selection (software/web/mobile/data)
-- Job limit configuration
-- Send emails toggle
-- Real-time log output
+- Set default AI model preferences.
+- View verified working models.
 
-### Job Logs (`JobLogs.jsx`)
+## 🔗 API Integration
 
-Displays a table of all job applications with status indicators:
-- Timestamp
-- Job title and company
-- Recipient email
-- Status (success/failed/skipped/dry-run)
-- Error messages
+Communicates with the Python Flask backend at `http://localhost:5000`:
 
-## API Integration
+- `GET /api/logs`
+- `GET /api/stats`
+- `POST /api/run-jobs-stream`
+- `POST /api/settings`
 
-The dashboard communicates with the backend server through the following endpoints:
+## 🎨 Styling
 
-- `GET /api/logs` - Retrieve application logs
-- `GET /api/stats` - Retrieve application statistics
-- `POST /api/run-jobs` - Execute job processing
-- `GET /api/health` - Health check
-
-## Styling
-
-All components are styled with custom CSS files located in the `src/styles/` directory. The styling follows a clean, modern design with responsive layouts.
-
-## Development Guidelines
-
-1. All components should be functional components using React hooks
-2. CSS files should be colocated with components in the `src/styles/` directory
-3. API calls should be handled in the Dashboard component and passed down as props
-4. State management should use React's built-in useState and useEffect hooks
-5. Components should be reusable and modular
+Modern, clean UI with glassmorphism effects and responsive layout. Supports system preference for Dark Mode.
