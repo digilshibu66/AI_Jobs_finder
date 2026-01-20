@@ -17,7 +17,7 @@ An intelligent automated tool that scrapes job websites, generates **personalize
 
 ## 🏗️ System Architecture
 
-```mermaid
+```
 graph TD
     A[User] --> B[Web Dashboard / CLI]
     B --> C[Main Controller]
@@ -37,7 +37,6 @@ graph TD
     G --> P[Excel Logger]
     G --> Q[PDF Generator]
 ```
-
 ---
 
 ## 🚀 Quick Start (Docker)
