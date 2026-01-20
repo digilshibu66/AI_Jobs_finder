@@ -169,6 +169,12 @@ def run(resume_path, smtp_email, smtp_password,
             print(f"Platform: {job['platform']} | Budget: {job.get('budget', 'N/A')}")
         print("="*80)
         
+        # Skip jobs with masked details
+        if '****' in job_title or '****' in company:
+             print(f"  [SKIP] Job details are masked/hidden. Skipping.")
+             email_logger.log_job(job, email_sent=False, status="skipped_masked")
+             continue
+        
         # Update job status to processing
         email_logger.log_job(job, email_sent=False, status="processing")
         

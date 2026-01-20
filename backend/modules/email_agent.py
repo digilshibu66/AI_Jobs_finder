@@ -57,7 +57,11 @@ def generate_mail_body(job_title, job_description, resume_text, ai_model=None):
         }
     ]
 
-    response = call_ai_api(messages, ai_model).strip()
+    response = call_ai_api(messages, ai_model)
+    if not response:
+        raise ValueError("AI generated empty response")
+        
+    response = response.strip()
     
     # Clean up markdown syntax that might look bad in plain text
     response = response.replace("**", "").replace("__", "")
