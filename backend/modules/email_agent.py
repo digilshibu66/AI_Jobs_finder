@@ -224,23 +224,68 @@ def scrape_multiple_urls_for_email(urls):
     return None
 
 
-def verify_email_authenticity(email, company_name=None):
+def verify_email_authenticity(email, company_name=None, ai_model=None):
     """
-    Verify if an email is genuine by searching for it using Google Search API.
+    Verify if an email is genuine by:
+    1. Searching for it using Google Search API (if configured)
+    2. Asking AI to validate if it looks correct for the company
     
     Args:
         email (str): Email address to verify
         company_name (str): Company name associated with the email (optional)
+        ai_model (str): AI model to use for verification
         
     Returns:
         bool: True if email appears genuine, False otherwise
     """
+    # Quick sanity check
+    if not email or '@' not in email:
+        return False
+        
+    if "example.com" in email or "test.com" in email:
+        return False
+        
+    print(f"  [VERIFY] Verifying {email} for company {company_name}...")
+
+    # Step 1: AI Verification (User Requested)
+    # Ask AI if this email logic makes sense for the company
+    if company_name and ai_model:
+        try:
+            print(f"  [VERIFY] Asking AI to validate email format...")
+            validation_prompt = f"""
+            Task: Verify if this email address is valid for the given company.
+            
+            Email: {email}
+            Company: {company_name}
+            
+            Rules:
+            1. Check if the domain name matches the company name or valid variations.
+            2. Check if the username part (before @) looks professional (e.g., info, contact, hr, jobs, firstname.lastname).
+            3. If the company is "Freelancer Client" or "Unknown", and the email is generic (gmail/yahoo), answer NO.
+            4. If the email is clearly a placeholder (domain.com, email.com), answer NO.
+            
+            Answer strictly with "YES" or "NO".
+            """
+            
+            messages = [{"role": "user", "content": validation_prompt}]
+            response = call_ai_api(messages, ai_model).strip().upper()
+            
+            if "NO" in response:
+                print(f"  [VERIFY] AI rejected this email: {response}")
+                return False
+            else:
+                print(f"  [VERIFY] AI approved this email.")
+                
+        except Exception as e:
+            print(f"  [VERIFY] AI verification failed: {e}")
+            # Continue to Google search check if AI fails
+
+    # Step 2: Google Search Validation
     api_key = os.environ.get("GOOGLE_SEARCH_API_KEY")
     cx = os.environ.get("GOOGLE_SEARCH_ENGINE_ID")
     
     if not api_key or not cx:
-        # If Google Search API is not configured, do basic validation
-        print(f"  [WARNING] Google Search API not configured. Doing basic email validation.")
+        print(f"  [WARNING] Google Search API not configured. Creating based on AI/Syntax check.")
         return True
     
     try:
@@ -255,22 +300,36 @@ def verify_email_authenticity(email, company_name=None):
         )
         
         response = requests.get(url)
-        response.raise_for_status()
+        # 404 is fine, just means no results? No, Custom Search API usually returns 200 with empty items.
         
-        data = response.json()
-        items = data.get("items", [])
-        
-        # If we found search results containing this email, it's likely genuine
-        if items:
-            print(f"  [VALIDATION] Email {email} appears on web pages")
-            return True
+        if response.status_code == 200:
+            data = response.json()
+            items = data.get("items", [])
+            
+            # If we found search results containing this email, it's likely genuine
+            if items:
+                print(f"  [VERIFY] Email {email} appears on {len(items)} web pages")
+                return True
+            else:
+                print(f"  [VERIFY] Email {email} not found in Google Search results.")
+                # If AI said YES but Google says "not found", we might still trust AI if it looks very standard.
+                # But to be safe, if we have Search API, we prefer confirmation.
+                # However, many valid emails are not indexed.
+                # We'll allow it if the domain matches the company name exactly.
+                if company_name:
+                    clean_company = re.sub(r'[^a-zA-Z0-9]', '', company_name).lower()
+                    if clean_company in email.lower():
+                        print(f"  [VERIFY] Allowing email because domain matches company name.")
+                        return True
+                
+                print("[VERIFY] Rejecting email because it was not found online and domain check passed partially.")
+                return False
         else:
-            print(f"  [WARNING] Email {email} not found in web search results, but treating as valid to avoid false negatives.")
-            return True
+            print(f"  [VERIFY] Google Search API error: {response.status_code}")
+            return True # Fail open if API fails
             
     except Exception as e:
         print(f"  [ERROR] Email verification failed: {e}")
-        # If verification fails, we'll assume it's valid to avoid blocking legitimate emails
         return True
 
 
@@ -287,7 +346,7 @@ def find_company_email(job_title, company_name, job_data=None, ai_model=None):
         email = find_company_email_with_openrouter(job_data, ai_model)
         if email:
             # Verify the email is genuine before returning it
-            if verify_email_authenticity(email, company_name):
+            if verify_email_authenticity(email, company_name, ai_model):
                 print(f"  [VERIFIED] Email {email} is authentic")
                 return email
             else:
@@ -325,7 +384,7 @@ If not found, return: NOT_FOUND
             if email and 'NOT_FOUND' not in result.upper():
                 print(f"  [FOUND] Found email via AI: {email}")
                 # Verify the email is genuine before returning it
-                if verify_email_authenticity(email, company_name):
+                if verify_email_authenticity(email, company_name, ai_model):
                     print(f"  [VERIFIED] Email {email} is authentic")
                     return email
                 else:
@@ -356,7 +415,7 @@ If not found, return: NOT_FOUND
                 if email:
                     print(f"  [FOUND] Found email in search snippet: {email}")
                     # Verify the email is genuine before returning it
-                    if verify_email_authenticity(email, company_name):
+                    if verify_email_authenticity(email, company_name, ai_model):
                         print(f"  [VERIFIED] Email {email} is authentic")
                         return email
                     else:

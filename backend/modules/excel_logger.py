@@ -71,6 +71,24 @@ class EmailLogger:
             print(f"Error checking if job is processed: {e}")
             return False
 
+    def _clean_text(self, text):
+        """Clean text to handle encoding issues and masked content."""
+        if not isinstance(text, str):
+            return text
+            
+        # Fix encoding issues (mojibake)
+        try:
+            # Try to fix common encoding errors
+            if "Ã" in text or "Â" in text:  # Common signs of UTF-8 decoded as Latin-1
+                try:
+                    text = text.encode('latin-1').decode('utf-8')
+                except:
+                    pass
+        except:
+            pass
+            
+        return text
+
     def log_job(self, job_data, email_sent=False, status="scraped", error_message=""):
         """Log a scraped job to the Excel file.
         
@@ -90,6 +108,14 @@ class EmailLogger:
             # Generate job hash
             job_hash = self._generate_job_hash(job_data)
             
+            # Clean data fields
+            title = self._clean_text(job_data.get('title', ''))
+            company = self._clean_text(job_data.get('company', ''))
+            email = self._clean_text(job_data.get('email', ''))
+            subject = self._clean_text(job_data.get('subject', ''))
+            body = self._clean_text(job_data.get('body', ''))
+            error = self._clean_text(str(error_message)) if error_message else ""
+            
             # Check if job already exists
             if 'job_hash' in df.columns and job_hash in df['job_hash'].values:
                 # Update existing entry if needed
@@ -98,20 +124,20 @@ class EmailLogger:
                     df.loc[mask, 'email_sent'] = True
                     df.loc[mask, 'status'] = status
                     df.loc[mask, 'timestamp'] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                    if error_message:
+                    if error:
                         df['error_message'] = df['error_message'].astype(object)
-                        df.loc[mask, 'error_message'] = str(error_message)
+                        df.loc[mask, 'error_message'] = error
             else:
                 # Create new entry
                 new_entry = {
                     "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                    "job_title": job_data.get('title', ''),
-                    "company": job_data.get('company', ''),
-                    "to_email": job_data.get('email', ''),
-                    "subject": job_data.get('subject', ''),
-                    "body": job_data.get('body', ''),
+                    "job_title": title,
+                    "company": company,
+                    "to_email": email,
+                    "subject": subject,
+                    "body": body,
                     "status": status,
-                    "error_message": error_message,
+                    "error_message": error,
                     "source_url": job_data.get('url', ''),
                     "job_hash": job_hash,
                     "email_sent": email_sent
@@ -122,7 +148,7 @@ class EmailLogger:
             
             # Save to Excel
             self._safe_write_to_excel(df)
-            print(f"Logged job: {job_data.get('title', '')} at {job_data.get('company', '')}")
+            print(f"Logged job: {title} at {company}")
             
         except Exception as e:
             print(f"Failed to log job: {e}")

@@ -81,6 +81,10 @@ def is_valid_target_email(email, company_name, platform):
     if not email:
         return False
     
+    # Reject masked emails
+    if '*' in email:
+        return False
+    
     email_lower = email.lower()
     
     # Block freelance platform domains
@@ -199,6 +203,11 @@ def run(resume_path, smtp_email, smtp_password,
         # Find company/client email
         to_email = job.get('email')  # Check if email was extracted from job posting
         
+        # If email is masked or invalid, treat it as not found so we search for it
+        if to_email and '*' in to_email:
+            print(f"  [INFO] Email '{to_email}' is masked/hidden. Will search for valid email.")
+            to_email = None
+
         if to_email:
             print(f"  [FOUND] Email found in job posting: {to_email}")
         else:
