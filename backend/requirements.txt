@@ -12,3 +12,4 @@ faiss-cpu
 google-generativeai
 python-dotenv
 reportlab
+dnspython

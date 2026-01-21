@@ -15,7 +15,7 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 # Use absolute imports instead of relative imports
 sys.path.append(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'modules'))
-from modules.scraper import scrape_jobs
+from modules.scraper import scrape_jobs, is_masked
 from modules.resume_embedder import extract_resume_text
 from modules.email_agent import generate_mail_body, find_company_email
 from modules.smtp_sender import send_email
@@ -148,6 +148,10 @@ def run(resume_path, smtp_email, smtp_password,
     # Filter out already processed jobs
     jobs = []
     for job in scraped_jobs:
+        # Extra safety check for masked jobs
+        if is_masked(job.get('title', '')) or is_masked(job.get('company', '')):
+            continue
+            
         if not email_logger.is_job_processed(job):
             jobs.append(job)
             # Log the job as scraped (but not yet processed for email)
@@ -207,22 +211,25 @@ def run(resume_path, smtp_email, smtp_password,
                 motivational_letter_path = None
         
         # Find company/client email
-        to_email = job.get('email')  # Check if email was extracted from job posting
+        to_emails = []  # Changed to list to handle multiple emails
+        job_email = job.get('email')  # Check if email was extracted from job posting
         
         # If email is masked or invalid, treat it as not found so we search for it
-        if to_email and '*' in to_email:
-            print(f"  [INFO] Email '{to_email}' is masked/hidden. Will search for valid email.")
-            to_email = None
+        if job_email and '*' in job_email:
+            print(f"  [INFO] Email '{job_email}' is masked/hidden. Will search for valid email.")
+            job_email = None
 
-        if to_email:
-            print(f"  [FOUND] Email found in job posting: {to_email}")
+        if job_email:
+            print(f"  [FOUND] Email found in job posting: {job_email}")
+            to_emails = [job_email]  # Convert to list for consistent handling
         else:
             print(f"  [SEARCH] Searching for contact email...")
             try:
                 # Pass full job data to the email finder for better search results
-                to_email = find_company_email(job['title'], job.get('company',''), job_data=job, ai_model=ai_model)
+                # find_company_email now returns a list of validated emails
+                found_emails = find_company_email(job['title'], job.get('company',''), job_data=job, ai_model=ai_model)
                 
-                if not to_email:
+                if not found_emails:
                     print("  [INFO] No valid email found for this job")
                     # Log as skipped since we cannot find any email
                     email_logger.log_email(
@@ -235,6 +242,9 @@ def run(resume_path, smtp_email, smtp_password,
                         source_url=job.get('source', '')
                     )
                     continue
+                
+                # found_emails is now a list
+                to_emails = found_emails if isinstance(found_emails, list) else [found_emails]
                     
             except Exception as e:
                 error_msg = f"Error finding company email: {e}"
@@ -251,31 +261,36 @@ def run(resume_path, smtp_email, smtp_password,
                 )
                 continue
         
-        # Validate the email - skip if it's a platform email or generic fallback
-        if to_email:
-            if not is_valid_target_email(to_email, job.get('company', ''), job.get('platform', '')):
-                print(f"  [INVALID] Email '{to_email}' is not a valid client/company email (platform or generic)")
-                print(f"  [SKIP] Skipping - Only sending to actual company/client emails")
-                
-                # Log the skipped job with subject/body for visibility
-                email_logger.log_email(
-                    job_data=job,
-                    to_email=to_email,
-                    subject=subject,
-                    body=body,
-                    status="SKIPPED",
-                    error_message="Not a valid company email - platform or generic email",
-                    source_url=job.get('source', '')
-                )
-                continue
-                
+        # Filter out invalid emails (platform emails, etc.)
+        valid_emails = []
+        for email in to_emails:
+            if is_valid_target_email(email, job.get('company', ''), job.get('platform', '')):
+                valid_emails.append(email)
+            else:
+                print(f"  [INVALID] Email '{email}' is not a valid client/company email (platform or generic)")
+        
+        if not valid_emails:
+            print(f"  [SKIP] No valid company/client emails found - Only platform or generic emails available")
+            # Log the skipped job with subject/body for visibility
+            email_logger.log_email(
+                job_data=job,
+                to_email=", ".join(to_emails) if to_emails else "",
+                subject=subject,
+                body=body,
+                status="SKIPPED",
+                error_message="Not a valid company email - platform or generic email",
+                source_url=job.get('source', '')
+            )
+            continue
+        
         # If still no email, try fallback method (but validate it too)
-        if not to_email:
+        if not valid_emails:
             company_name = job.get('company', '')
-            to_email = generate_fallback_email(company_name)
+            fallback_email = generate_fallback_email(company_name)
             
-            if to_email and is_valid_target_email(to_email, company_name, job.get('platform', '')):
-                print(f"[FALLBACK] Using fallback email: {to_email}")
+            if fallback_email and is_valid_target_email(fallback_email, company_name, job.get('platform', '')):
+                print(f"[FALLBACK] Using fallback email: {fallback_email}")
+                valid_emails = [fallback_email]
             else:
                 print(f"  [NOT_FOUND] No valid company/client email found for this job")
                 print(f"  [SKIP] Skipping - Only sending to actual company/client emails, not platforms")
@@ -292,16 +307,16 @@ def run(resume_path, smtp_email, smtp_password,
                 )
                 continue
             
-        print(f"\nTarget Email: {to_email}")
+        print(f"\n📧 Target Emails ({len(valid_emails)}): {', '.join(valid_emails)}")
 
         # Prepare attachments
         attachments = [resume_path]
         if motivational_letter_path:
             attachments.append(motivational_letter_path)
             
-        # Send email if we have a valid recipient
-        if to_email:
-            print(f"Sending email to {to_email}...")
+        # Send email to ALL valid recipients
+        for email_index, to_email in enumerate(valid_emails, 1):
+            print(f"\n[{email_index}/{len(valid_emails)}] Sending email to {to_email}...")
             
             try:
                 if not dry_run:
@@ -319,20 +334,20 @@ def run(resume_path, smtp_email, smtp_password,
                     
                     if send_result.get('success'):
                         status = "SENT"
-                        print(f"Email sent successfully! (Attempts: {send_result['retry_count']})")
+                        print(f"  ✅ Email sent successfully! (Attempts: {send_result['retry_count']})")
                         if send_result['retry_count'] > 1:
                             print(f"  [NOTE] Email required {send_result['retry_count']} attempts to send")
                     else:
                         status = "FAILED"
                         error_msg = send_result.get('error', 'Unknown error')
-                        print(f"Failed to send email: {error_msg}")
+                        print(f"  ❌ Failed to send email: {error_msg}")
                         
                 else:
                     # Dry run mode
-                    print("[DRY RUN] Would send email to:", to_email)
-                    print("Subject:", subject)
-                    print("Body preview:", body[:200] + "...")
-                    print("Attachments:", [os.path.basename(a) for a in attachments])
+                    print("  [DRY RUN] Would send email to:", to_email)
+                    print("  Subject:", subject)
+                    print("  Body preview:", body[:200] + "...")
+                    print("  Attachments:", [os.path.basename(a) for a in attachments])
                     status = "DRY_RUN"
                 
                 # Log the email with delivery status
@@ -355,7 +370,7 @@ def run(resume_path, smtp_email, smtp_password,
                         add_to_retry_queue(job, to_email, subject, body, attachments)
             except Exception as e:
                 error_msg = str(e)
-                print(f"Error in email process: {error_msg}")
+                print(f"  ❌ Error in email process: {error_msg}")
                 
                 # Log the failure
                 email_logger.log_email(
@@ -373,10 +388,15 @@ def run(resume_path, smtp_email, smtp_password,
                     print("  [RETRY] Will retry this email due to temporary error")
                     add_to_retry_queue(job, to_email, subject, body, attachments)
             
-            # Add a delay between jobs to reduce API rate limiting (free tier needs 10+ seconds)
-            job_delay = int(os.getenv('JOB_DELAY', '10'))
-            print(f"  [DELAY] Waiting {job_delay}s before next job to avoid rate limits...")
-            time.sleep(job_delay)
+            # Add a small delay between emails to the same company (if sending to multiple)
+            if email_index < len(valid_emails):
+                print(f"  [DELAY] Waiting 3s before next email to same company...")
+                time.sleep(3)
+            
+        # Add a delay between jobs to reduce API rate limiting (free tier needs 10+ seconds)
+        job_delay = int(os.getenv('JOB_DELAY', '10'))
+        print(f"  [DELAY] Waiting {job_delay}s before next job to avoid rate limits...")
+        time.sleep(job_delay)
     
     # Process retry queue if enabled
     if process_retries and not dry_run:

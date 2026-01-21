@@ -97,8 +97,21 @@ def is_tech_related(text: str, job_type: str = 'software'):
         job_type_match = job_type.lower() in t
         return has_tech_keywords and job_type_match
     
+
     return has_tech_keywords
 
+def is_masked(text):
+    """Check if text contains masking characters like ***."""
+    if not text:
+        return False
+    # Check for direct asterisk masking
+    if '***' in text:
+        return True
+    # Check for heavy masking (high percentage of placeholder chars)
+    # If more than 50% of the string is *, it's definitely masked
+    if len(text) > 3 and (text.count('*') / len(text)) > 0.4:
+        return True
+    return False
 
 # ---------------------------------------------------------------------------------------------------------------------
 # GOOGLE SEARCH → LINKEDIN JOBS
@@ -413,6 +426,10 @@ def scrape_linkedin_jobs(limit=10, job_name=None, location=None):
                 
                 # For normal jobs, we don't filter by tech keywords since job_name is more specific
                 description = f"{title} at {company} - {location}"
+                
+                if is_masked(title) or is_masked(company):
+                    continue
+
                 jobs.append({
                     "title": title,
                     "company": company,
@@ -480,6 +497,10 @@ def scrape_indeed_jobs(limit=10, job_name=None, location=None):
                 
                 # For normal jobs, we don't filter by tech keywords since job_name is more specific
                 description = f"{title} at {company} - {location}"
+                
+                if is_masked(title) or is_masked(company):
+                    continue
+
                 jobs.append({
                     "title": title,
                     "company": company,
@@ -553,6 +574,10 @@ def scrape_glassdoor_jobs(limit=10, job_name=None, location=None):
                 
                 # For normal jobs, we don't filter by tech keywords since job_name is more specific
                 description = f"{title} at {company} - {location}"
+                
+                if is_masked(title) or is_masked(company):
+                    continue
+
                 jobs.append({
                     "title": title,
                     "company": company,
@@ -633,6 +658,10 @@ def scrape_google_normal_jobs(limit=10, job_name=None, location=None):
                 
                 # For normal jobs, we don't filter by tech keywords since job_name is more specific
                 # But we should still rank jobs based on relevance to the job_name
+                
+                if is_masked(title) or is_masked(company):
+                    continue
+
                 jobs.append({
                     "title": title,
                     "company": "Unknown / Google",
