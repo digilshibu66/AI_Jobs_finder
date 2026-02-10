@@ -7,6 +7,7 @@ const ActivityPage = () => {
   const [logs, setLogs] = useState([]);
   const [totalLogs, setTotalLogs] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   // Filter states
   const [searchTerm, setSearchTerm] = useState('');
@@ -132,6 +133,68 @@ const ActivityPage = () => {
     setCurrentPage(1);
   };
 
+  const handleDeleteAll = async () => {
+    if (!window.confirm('⚠️ Delete ALL records? This cannot be undone!')) {
+      return;
+    }
+
+    setIsDeleting(true);
+    try {
+      const response = await fetch('/api/logs/delete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ deleteAll: true })
+      });
+
+      const data = await response.json();
+      
+      if (data.success) {
+        alert('✅ All records deleted successfully!');
+        fetchLogs(); // Refresh logs
+      } else {
+        alert('❌ Failed to delete records: ' + data.message);
+      }
+    } catch (error) {
+      console.error('Error deleting records:', error);
+      alert('❌ Error deleting records: ' + error.message);
+    }
+    setIsDeleting(false);
+  };
+
+  const handleDeleteByStatus = async () => {
+    if (!filterStatus) {
+      alert('⚠️ Please select a status filter first');
+      return;
+    }
+
+    if (!window.confirm(`⚠️ Delete all records with status "${filterStatus}"? This cannot be undone!`)) {
+      return;
+    }
+
+    setIsDeleting(true);
+    try {
+      const response = await fetch('/api/logs/delete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: filterStatus })
+      });
+
+      const data = await response.json();
+      
+      if (data.success) {
+        alert('✅ Records deleted successfully!');
+        setFilterStatus(''); // Clear filter
+        fetchLogs(); // Refresh logs
+      } else {
+        alert('❌ ' + data.message);
+      }
+    } catch (error) {
+      console.error('Error deleting records:', error);
+      alert('❌ Error deleting records: ' + error.message);
+    }
+    setIsDeleting(false);
+  };
+
   const cardStyle = {
     backgroundColor: theme.colors.surface,
     borderRadius: '16px',
@@ -212,6 +275,34 @@ const ActivityPage = () => {
               style={{ color: theme.colors.primary }}
             >
               Clear Filters
+            </button>
+
+            <button
+              className="delete-btn delete-filtered"
+              onClick={handleDeleteByStatus}
+              disabled={!filterStatus || isDeleting}
+              style={{ 
+                backgroundColor: filterStatus ? '#f56565' : '#cbd5e0',
+                color: 'white',
+                cursor: filterStatus && !isDeleting ? 'pointer' : 'not-allowed',
+                opacity: filterStatus && !isDeleting ? 1 : 0.5
+              }}
+              title={filterStatus ? `Delete all ${filterStatus} records` : 'Select a status to delete'}
+            >
+              {isDeleting ? '⏳ Deleting...' : '🗑️ Delete Filtered'}
+            </button>
+
+            <button
+              className="delete-btn delete-all"
+              onClick={handleDeleteAll}
+              disabled={isDeleting}
+              style={{ 
+                backgroundColor: isDeleting ? '#cbd5e0' : '#e53e3e',
+                color: 'white',
+                cursor: isDeleting ? 'not-allowed' : 'pointer'
+              }}
+            >
+              {isDeleting ? '⏳ Deleting...' : '🗑️ Delete All'}
             </button>
           </div>
 

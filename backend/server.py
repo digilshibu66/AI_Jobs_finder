@@ -402,5 +402,58 @@ def serve_control_panel():
         return f'Error loading file: {str(e)}', 500
 
 
+# Delete records endpoint
+@app.route('/api/logs/delete', methods=['POST'])
+def delete_logs():
+    """Delete records from Excel log"""
+    try:
+        data = request.json or {}
+        delete_all = data.get('deleteAll', False)
+        status_filter = data.get('status', None)
+        
+        # Import email_logger
+        sys.path.insert(0, BACKEND_DIR)
+        from modules.excel_logger import email_logger
+        
+        if delete_all:
+            # Delete all records
+            success = email_logger.delete_all_records()
+            if success:
+                return jsonify({
+                    'success': True,
+                    'message': 'All records deleted successfully'
+                })
+            else:
+                return jsonify({
+                    'success': False,
+                    'message': 'Failed to delete records'
+                }), 500
+                
+        elif status_filter:
+            # Delete by status
+            success = email_logger.delete_records_by_status(status_filter)
+            if success:
+                return jsonify({
+                    'success': True,
+                    'message': f'Records with status "{status_filter}" deleted successfully'
+                })
+            else:
+                return jsonify({
+                    'success': False,
+                    'message': f'No records found with status "{status_filter}"'
+                }), 404
+        else:
+            return jsonify({
+                'success': False,
+                'message': 'Please specify deleteAll or status parameter'
+            }), 400
+            
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'message': str(e)
+        }), 500
+
+
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)

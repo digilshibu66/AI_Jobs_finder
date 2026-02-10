@@ -49,6 +49,56 @@
   padding: 10px 14px;
   border: 2px solid transparent;
   border-radius: 8px;
+  font-size: 0.9rem;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.clear-btn,
+.delete-btn {
+  padding: 10px 20px;
+  border: none;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+  align-self: flex-end;
+}
+
+.clear-btn {
+  background: transparent;
+  border: 2px solid currentColor;
+}
+
+.clear-btn:hover {
+  opacity: 0.8;
+  transform: translateY(-1px);
+}
+
+.delete-btn {
+  font-weight: 600;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+.delete-btn:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+.delete-btn:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.delete-filtered {
+  margin-left: auto;
+}
+
+.delete-all {
+  font-weight: 700;
+}
+  border-radius: 8px;
   font-size: 0.95rem;
   transition: border-color 0.2s ease;
 }
