@@ -12,6 +12,7 @@ import time
 import random
 from bs4 import BeautifulSoup
 from .ai_wrapper import call_ai_api
+from .email_validator import EmailValidator, get_best_emails
 
 # ---------------- Email Body Generation ----------------
 
@@ -251,12 +252,12 @@ def verify_email_authenticity(email, company_name=None, ai_model=None):
 
 def find_company_email(job_title, company_name, job_data=None, ai_model=None):
     """
-    Find company/client email using comprehensive scraping strategy:
+    Find company/client email using comprehensive scraping strategy with advanced validation:
     1️⃣ Identify company domain via multiple methods (job URL, domain patterns, Google)
     2️⃣ Comprehensively crawl entire website (recursive, depth-limited) for all emails
-    3️⃣ Score emails by relevance (careers/hr emails prioritized)
-    4️⃣ Verify top-scored emails via SMTP
-    5️⃣ Fallback to generic emails (careers@, hr@, etc.) if needed
+    3️⃣ Advanced validation using EmailValidator (syntax, domain, MX, scoring)
+    4️⃣ Score emails by relevance and company match
+    5️⃣ Return ONLY validated, high-quality company emails
     
     Configuration via environment variables:
     - CRAWL_DEPTH: Max crawl depth (default: 2)
@@ -266,15 +267,18 @@ def find_company_email(job_title, company_name, job_data=None, ai_model=None):
     """
     if not company_name or '*' in company_name:
          print(f"  [SKIP] Company name missing or masked.")
-         return None
+         return []
 
     # Step 0: Check if it's a platform/pseudo-company
     platform_indicators = ['client', 'freelancer', 'upwork', 'guru', 'fiverr', 'remoteok']
     if any(p in company_name.lower() for p in platform_indicators):
         print(f"  [SKIP] Skipping platform placeholder: {company_name}")
-        return None
+        return []
 
     print(f"  [FIND] Starting enhanced email search for {company_name}...")
+    
+    # Initialize email validator
+    validator = EmailValidator()
     
     # Step 0.5: Try to extract domain from job source URL
     domain = None
@@ -366,26 +370,34 @@ def find_company_email(job_title, company_name, job_data=None, ai_model=None):
             )
             
             if email_results:
-                print(f"  [VERIFY] Validating top {min(5, len(email_results))} emails from comprehensive crawl...")
+                print(f"  [FOUND] Found {len(email_results)} emails from website crawl")
                 
-                # Collect all validated emails
-                validated_emails = []
-                for email, score, metadata in email_results[:5]:  # Check top 5
-                    print(f"  [CHECKING] {email} (score: {score})...")
-                    is_valid, reason = verify_email_smtp(email)
+                # Extract just the email addresses
+                found_emails = [email for email, score, metadata in email_results]
+                
+                # Use advanced validator to filter and rank
+                print(f"  [VALIDATE] Validating emails with advanced quality scoring...")
+                validated_results = validator.batch_validate(
+                    emails=found_emails,
+                    company_name=company_name,
+                    job_domain=domain
+                )
+                
+                if validated_results:
+                    print(f"  [SUCCESS] Found {len(validated_results)} validated emails:")
+                    for i, result in enumerate(validated_results[:5], 1):
+                        print(f"    {i}. {result['email']} (score: {result['score']}/100 - {result['recommendation']})")
                     
-                    if is_valid:
-                        print(f"  ✅ [SUCCESS] Found validated email: {email}")
-                        print(f"  [INFO] Email found on {len(metadata['pages'])} pages, first seen at: {metadata['first_found']}")
-                        validated_emails.append(email)
+                    # Return only highly recommended or acceptable emails
+                    best_emails = [r['email'] for r in validated_results 
+                                  if r['recommendation'] in ['highly_recommended', 'acceptable']]
+                    
+                    if best_emails:
+                        return best_emails
                     else:
-                        print(f"  [SKIP] {email} failed SMTP verification ({reason})")
-                
-                if validated_emails:
-                    print(f"  [SUMMARY] Found {len(validated_emails)} validated emails: {', '.join(validated_emails)}")
-                    return validated_emails  # Return list of all validated emails
-                
-                print(f"  [WARNING] All top emails failed SMTP verification. Trying fallback...")
+                        print(f"  [WARNING] Emails found but quality scores too low")
+                else:
+                    print(f"  [WARNING] All emails failed validation checks")
             else:
                 print(f"  [INFO] Comprehensive crawl found no emails on website")
                 
@@ -393,24 +405,32 @@ def find_company_email(job_title, company_name, job_data=None, ai_model=None):
             print(f"  [ERROR] Comprehensive crawl failed: {e}")
             print(f"  [FALLBACK] Will try generic email patterns...")
 
-
     # Fallback Strategy: Generic Emails (info@, careers@, etc)
     if domain:
         print("  [FALLBACK] Checking generic company emails...")
         generic_prefixes = ['careers', 'jobs', 'hr', 'recruiting', 'info', 'hello', 'contact']
-        validated_generic_emails = []
-        for prefix in generic_prefixes:
-            email = f"{prefix}@{domain}"
-            is_valid, reason = verify_email_smtp(email)
-            if is_valid:
-                 print(f"  ✅ [SUCCESS] Found validated generic email: {email}")
-                 validated_generic_emails.append(email)
+        generic_candidates = [f"{prefix}@{domain}" for prefix in generic_prefixes]
         
-        if validated_generic_emails:
-            print(f"  [SUMMARY] Found {len(validated_generic_emails)} validated generic emails: {', '.join(validated_generic_emails)}")
-            return validated_generic_emails
+        # Validate generic emails
+        validated_results = validator.batch_validate(
+            emails=generic_candidates,
+            company_name=company_name,
+            job_domain=domain
+        )
+        
+        if validated_results:
+            print(f"  [SUCCESS] Found {len(validated_results)} validated generic emails:")
+            for i, result in enumerate(validated_results[:3], 1):
+                print(f"    {i}. {result['email']} (score: {result['score']}/100)")
+            
+            # Return top validated generic emails
+            best_emails = [r['email'] for r in validated_results[:3] 
+                          if r['recommendation'] in ['highly_recommended', 'acceptable']]
+            
+            if best_emails:
+                return best_emails
                  
-    print("  [INFO] No email found via Crawler or Generic fallback.")
+    print("  [INFO] No validated email found. Skipping this job.")
     return []  # Return empty list instead of None
 
 
