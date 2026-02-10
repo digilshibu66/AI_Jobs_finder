@@ -188,6 +188,51 @@ class EmailLogger:
                 print(f"Error writing to Excel: {e}")
                 break
 
+    def delete_all_records(self):
+        """Delete all records from the Excel log file."""
+        try:
+            # Create empty DataFrame with columns
+            df = pd.DataFrame(columns=self.columns)
+            
+            # Write to Excel
+            self._safe_write_to_excel(df)
+            print(f"✅ All records deleted from {self.log_file_path}")
+            return True
+        except Exception as e:
+            print(f"❌ Failed to delete records: {e}")
+            return False
+    
+    def delete_records_by_status(self, status):
+        """Delete records with a specific status.
+        
+        Args:
+            status: Status to filter (e.g., 'FAILED', 'SKIPPED', 'DRY_RUN')
+        """
+        try:
+            if not os.path.exists(self.log_file_path):
+                print(f"Log file does not exist: {self.log_file_path}")
+                return False
+            
+            # Read existing data
+            df = pd.read_excel(self.log_file_path, engine='openpyxl')
+            initial_count = len(df)
+            
+            # Filter out records with the specified status
+            df = df[df['status'].str.upper() != status.upper()]
+            deleted_count = initial_count - len(df)
+            
+            if deleted_count > 0:
+                # Save filtered data
+                self._safe_write_to_excel(df)
+                print(f"✅ Deleted {deleted_count} records with status '{status}'")
+                return True
+            else:
+                print(f"No records found with status '{status}'")
+                return False
+        except Exception as e:
+            print(f"❌ Failed to delete records: {e}")
+            return False
+
 
 # Global instance
 email_logger = EmailLogger()
